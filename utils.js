@@ -151,7 +151,7 @@ AB.sendAnalyze = (cacheKey, prompt) => new Promise((resolve) => {
       if (chrome.runtime.lastError) resolve({ ok: false, error: chrome.runtime.lastError.message });
       else resolve(res || { ok: false, error: 'No response from extension' });
     });
-  } catch (err) {
+  } catch (_err) {
     resolve({ ok: false, error: 'Extension was reloaded. Refresh this tab.' });
   }
 });

@@ -284,16 +284,20 @@ async function raceModels(callModel, apiKey, models, prompt, hedgeDelayMs) {
     return winner;
   } catch (err) {
     controllers.forEach(c => c.abort());
-    if (err.isAuthFailure) throw new Error('This key was rejected. Check it in the extension settings.');
+    // Each branch below replaces the raw error with a friendlier, user-facing message —
+    // `cause` keeps the original attached so it's still inspectable in devtools rather
+    // than genuinely discarded.
+    if (err.isAuthFailure) throw new Error('This key was rejected. Check it in the extension settings.', { cause: err });
     if (err.isDailyQuota) {
       const when = err.resetAt ? ` (resets ${new Date(err.resetAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})` : '';
       throw new Error(
         `This key has used up its free requests for today${when}. Retrying won't help until the reset. ` +
         (err.upgradeUrl ? `Add a small amount of credit at ${err.upgradeUrl} to raise the daily free-model limit, or ` : '') +
-        'switch to a different provider or key in the extension settings.'
+        'switch to a different provider or key in the extension settings.',
+        { cause: err }
       );
     }
-    throw new Error('All free models failed right now. Try again in a few seconds.\n' + failures.join('\n'));
+    throw new Error('All free models failed right now. Try again in a few seconds.\n' + failures.join('\n'), { cause: err });
   }
 }
 

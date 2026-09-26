@@ -98,20 +98,21 @@
       body,
       replay
     ]);
-    return { wrap, body, counter, replay };
+    return { wrap, body, counter, replay, timerHandle: null };
   }
 
   // The actual animation: resets to a clean state, then deletes sentences in batches
-  // until only the "kept" ones remain. Safe to call again (Replay) — clears its own
-  // previous timer first, since `dom` and `plan` are shared with any earlier run.
+  // until only the "kept" ones remain. Safe to call again (Replay): the pending-timer
+  // handle lives on `dom` (created once, shared across every call for this answer),
+  // not as a local, so a second call genuinely cancels the first run's remaining
+  // timers instead of leaving them ticking in the background alongside the new run.
   function runDecayAnimation(dom, sentences, plan, timing) {
     const { body, counter } = dom;
     const { toDelete, totalWords } = plan;
     const { batchSize, stepDelay, dyingMs } = timing;
     let remaining = totalWords;
-    let timer = null;
 
-    clearTimeout(timer);
+    clearTimeout(dom.timerHandle);
     counter.textContent = `${remaining} words`;
     counter.classList.remove('ab-decay-done');
     body.querySelectorAll('.ab-decay-sent').forEach(n => {
@@ -141,9 +142,9 @@
     const tick = () => {
       if (cursor >= toDelete.length) return finish();
       killBatch();
-      timer = setTimeout(tick, stepDelay);
+      dom.timerHandle = setTimeout(tick, stepDelay);
     };
-    timer = setTimeout(tick, Math.max(300, stepDelay * 0.8));
+    dom.timerHandle = setTimeout(tick, Math.max(300, stepDelay * 0.8));
   }
 
   // -------------------------------------------------------------------------
