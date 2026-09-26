@@ -1,24 +1,20 @@
-# Pixel Perfect Pixel
+# Argue Back — website
 
-Implement exactly the screenshot and nothing else
-
-This project was built with [Lovable](https://lovable.dev).
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/4bc84ac1-9e01-4a09-8db8-fda41b2f4f1d).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+The marketing/demo site for [Argue Back](../README.md), the Chrome extension that takes apart AI chat answers instead of regenerating them.
 
 ## Development
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+You'll need Node.js (or Bun, which this project is set up to use — see `bun.lock`).
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Scripts
+
+- `npm run dev` — start the dev server
+- `npm run build` — production build
+- `npm run preview` — preview the production build locally
+- `npm run lint` — lint this project (scoped to `frontend/`, separate from the extension's own lint setup at the repo root)
+- `npm run format` — format with Prettier
