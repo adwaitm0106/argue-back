@@ -63,6 +63,17 @@
         replay
       ]);
 
+      // Pace the whole sequence to a roughly fixed watch time regardless of answer length:
+      // a 4-sentence answer and a 40-sentence answer should both finish decaying in a few
+      // seconds, one dramatically slow, the other snappy but still readable step by step.
+      const TARGET_TOTAL_MS = 6500;
+      const MIN_STEP_MS = 110, MAX_STEP_MS = 650;
+      const MAX_STEPS = 24; // beyond this, delete in small batches per tick instead of one at a time
+      const batchSize = Math.max(1, Math.ceil(toDelete.length / MAX_STEPS));
+      const stepCount = Math.max(1, Math.ceil(toDelete.length / batchSize));
+      const stepDelay = Math.min(MAX_STEP_MS, Math.max(MIN_STEP_MS, TARGET_TOTAL_MS / stepCount));
+      const dyingMs = Math.round(Math.min(420, Math.max(140, stepDelay * 0.7)));
+
       let remaining = totalWords;
       let timer = null;
       const play = () => {
@@ -70,30 +81,35 @@
         remaining = totalWords;
         counter.textContent = `${remaining} words`;
         counter.classList.remove('ab-decay-done');
-        body.querySelectorAll('.ab-decay-sent').forEach(n => n.classList.remove('ab-decay-dead', 'ab-decay-kept'));
-        let step = 0;
+        body.querySelectorAll('.ab-decay-sent').forEach(n => { n.classList.remove('ab-decay-dead', 'ab-decay-kept'); n.style.transitionDuration = ''; });
+        let cursor = 0;
         const tick = () => {
-          if (step >= toDelete.length) {
+          if (cursor >= toDelete.length) {
             body.querySelectorAll('.ab-decay-sent').forEach(n => { if (!n.classList.contains('ab-decay-dead')) n.classList.add('ab-decay-kept'); });
             counter.classList.add('ab-decay-done');
             counter.textContent = `${totalWords} words → ${remaining} words`;
             return;
           }
-          const i = toDelete[step++];
-          const node = body.querySelector(`.ab-decay-sent[data-i="${i}"]`);
-          if (node) {
+          const batch = toDelete.slice(cursor, cursor + batchSize);
+          cursor += batchSize;
+          for (const i of batch) {
+            const node = body.querySelector(`.ab-decay-sent[data-i="${i}"]`);
+            if (!node) continue;
+            node.style.transitionDuration = `${dyingMs}ms`;
             node.classList.add('ab-decay-dying');
             remaining = Math.max(0, remaining - wc(sentences[i]));
-            counter.textContent = `${remaining} words`;
-            setTimeout(() => node.classList.add('ab-decay-dead'), 420);
+            setTimeout(() => node.classList.add('ab-decay-dead'), dyingMs);
           }
-          timer = setTimeout(tick, 550);
+          counter.textContent = `${remaining} words`;
+          timer = setTimeout(tick, stepDelay);
         };
-        timer = setTimeout(tick, 500);
+        timer = setTimeout(tick, Math.max(300, stepDelay * 0.8));
       };
       replay.addEventListener('click', play);
-      // Auto-start the moment this mode is shown. requestAnimationFrame lets the DOM insert first.
-      requestAnimationFrame(() => requestAnimationFrame(play));
+      // Auto-start once this node is actually in the document. A plain timer, not
+      // requestAnimationFrame: browsers freeze rAF on a background or hidden tab, and a
+      // demo audience's tab focus is exactly the kind of thing we can't rely on.
+      setTimeout(play, 60);
       return wrap;
     }
   };
