@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.png" alt="Argue Back — AI answers sound confident. See how much of that is earned." width="100%">
+</p>
+
 # Argue Back
 
 **AI answers sound confident. Argue Back shows you how much of that confidence is earned.**
@@ -48,29 +52,44 @@ Argue Back splits the work in two.
 
 **The page is never modified.** Inline colors use the browser's CSS Custom Highlight API, and The Decay animates its own private copy of the text. Nothing about the original answer in the chat app is ever touched or rewritten.
 
-**It's covered by a real test suite.** `node tests/run.js` runs 59 checks with no dependencies and no build step: the local analyzer's sentence/hedge logic, every mode's prompt builder against edge cases (empty answers, quotes, 500-sentence walls of text), every mode's renderer against both well-formed and deliberately broken model output (missing fields, wrong types, empty arrays), and the request-racing logic itself (a stuck model gets hedged around, a bad key fails fast, an exhausted quota reports accurately). This exists because a prompt or rendering bug used to only surface when someone clicked that exact button live — now it's caught in under half a second, every time, before it ships.
+**It's covered by a real test suite.** `npm test` runs 61 checks with no dependencies and no build step: the local analyzer's sentence/hedge logic, every mode's prompt builder against edge cases (empty answers, quotes, 500-sentence walls of text), every mode's renderer against both well-formed and deliberately broken model output (missing fields, wrong types, empty arrays), and the request-racing logic itself (a stuck model gets hedged around, a bad key fails fast, an exhausted quota reports accurately). This exists because a prompt or rendering bug used to only surface when someone clicked that exact button live — now it's caught in under half a second, every time, before it ships. CI runs the same suite, plus lint and a CodeQL security scan, on every push.
 
+### End to end
+
+```mermaid
+flowchart LR
+    A["Chat page answer"] --> B["analyzer.js\nsentences · hedges · premises"]
+    B --> C["modes.js\none combined prompt, all 4 modes"]
+    C --> D{"background.js\ncache hit?"}
+    D -- yes --> H["Render instantly"]
+    D -- no --> E["llm_client.js\nraces OpenRouter / Groq / Gemini"]
+    E --> F["One JSON reply\n{ decay, graveyard, rebuild, audit }"]
+    F --> G["Cached for this answer"]
+    G --> H
+    H --> I1["The Decay\nanimates in place"]
+    H --> I2["The Graveyard\nrenders drafts"]
+    H --> I3["The Rebuild\ncycles versions"]
+    H --> I4["The Guess, Highlighted\npaints the scorecard"]
 ```
- chat page                    extension                                    OpenRouter
- ─────────                    ─────────                                    ──────────
- answer text  ──►  analyzer.js (sentences, hedges, premises)
-                        │
-                        ▼
-                   modes.js builds ONE combined JSON prompt (all 4 modes)
-                        │
-                        ▼
-                   background.js  ── cache hit? ──► return instantly
-                        │ miss
-                        ▼
-                   llm_client.js  ──┬─► model A (first, immediate)
-                                    ├─► model B (hedged in after ~2.5s if A hasn't answered)
-                                    └─► model C, D, E, F (further hedges, same pattern)
-                        │             first valid reply wins, the rest are cancelled
-                        ▼
-                   split into 4 slices, cached once, each mode renders its own slice
-                        │
-                        ▼
-                   animate the decay / render drafts / cycle rebuilds / paint the scorecard
+
+### One request, not four: how the model race works
+
+Free-tier models get busy unpredictably, so requests are hedged instead of tried one at a time — whichever model answers first with valid JSON wins, and everything else in flight is cancelled.
+
+```mermaid
+sequenceDiagram
+    participant X as content_script.js
+    participant M1 as Model A (first choice)
+    participant M2 as Model B (hedge)
+    participant M3 as Model C (hedge)
+
+    X->>M1: request (combined prompt)
+    Note over X: waiting ~2.5s...
+    X->>M2: hedge in — M1 hasn't answered yet
+    M2-->>X: valid JSON ✓
+    X--)M1: abort
+    X--)M3: never launched — race already won
+    Note over X: all 4 modes render from this one reply
 ```
 
 ## Free to run

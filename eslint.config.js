@@ -119,6 +119,9 @@ module.exports = [
     }
   },
   {
-    ignores: ['node_modules/**', 'web-demo/**']
+    // frontend/ is the marketing/demo website — a separate Vite + React + TypeScript
+    // project with its own package.json, its own eslint.config.js, and its own
+    // dependencies. It's linted and tested from inside frontend/ itself, not from here.
+    ignores: ['node_modules/**', 'web-demo/**', 'frontend/**']
   }
 ];
