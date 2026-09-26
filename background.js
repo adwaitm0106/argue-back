@@ -5,10 +5,19 @@ importScripts('llm_client.js');
 
 const CACHE_LIMIT = 200;
 
+// Storage shape: { provider: 'openrouter'|'groq'|'gemini', keys: { <provider>: '...' },
+// models: { <provider>: 'auto' | a specific model id } }. Each provider keeps its own
+// key and model choice, so switching providers in settings never clobbers the other
+// provider's saved setup.
 async function getSettings() {
-  const { apiKey, model } = await chrome.storage.sync.get(['apiKey', 'model']);
-  const fallbackKey = typeof OPENROUTER_KEY !== 'undefined' ? OPENROUTER_KEY : '';
-  return { apiKey: apiKey || fallbackKey, model: model || 'auto' };
+  const { provider, keys, models } = await chrome.storage.sync.get(['provider', 'keys', 'models']);
+  const activeProvider = provider || 'openrouter';
+  const fallbackKey = activeProvider === 'openrouter' && typeof OPENROUTER_KEY !== 'undefined' ? OPENROUTER_KEY : '';
+  return {
+    provider: activeProvider,
+    apiKey: (keys && keys[activeProvider]) || fallbackKey,
+    model: (models && models[activeProvider]) || 'auto'
+  };
 }
 
 async function readCache(key) {
@@ -28,34 +37,22 @@ async function writeCache(key, value) {
   await chrome.storage.local.set({ cache });
 }
 
-// Validates a key with a plain GET — no chat completion, no tokens spent, no dent in
-// the daily free-model quota it's there to report on in the first place.
-async function handleTestKey({ apiKey }) {
-  if (!apiKey) return { ok: false, error: 'Paste a key first.' };
-  let res;
-  try {
-    res = await fetch('https://openrouter.ai/api/v1/key', { headers: { Authorization: `Bearer ${apiKey}` } });
-  } catch (err) {
-    return { ok: false, error: `Could not reach OpenRouter: ${err.message}` };
-  }
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    return { ok: false, error: (data.error && data.error.message) || `OpenRouter rejected this key (HTTP ${res.status}).` };
-  }
-  const quota = data.data && data.data.free_model_daily_requests;
-  return { ok: true, quota: quota ? { used: quota.used, limit: quota.limit, remaining: quota.remaining } : null };
+// A plain GET (no chat completion, no tokens spent) so testing a key never eats into
+// the very quota it's there to check.
+async function handleTestKey({ provider, apiKey }) {
+  return testProviderKey(provider || 'openrouter', apiKey);
 }
 
 async function handleAnalyze({ cacheKey, prompt }) {
   const hit = await readCache(cacheKey);
   if (hit) return { ok: true, result: hit.result, model: hit.model, cached: true };
 
-  const { apiKey, model } = await getSettings();
-  if (!apiKey) {
-    return { ok: false, error: 'No OpenRouter key yet. Click the Argue Back icon in the toolbar to add one.' };
+  const settings = await getSettings();
+  if (!settings.apiKey) {
+    return { ok: false, error: 'No API key yet. Click the Argue Back icon in the toolbar to add one.' };
   }
 
-  const { json, model: used } = await callLLM(apiKey, prompt, model);
+  const { json, model: used } = await callLLM(settings, prompt);
   await writeCache(cacheKey, { result: json, model: used });
   return { ok: true, result: json, model: used, cached: false };
 }

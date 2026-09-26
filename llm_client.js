@@ -1,31 +1,83 @@
-// OpenRouter client. Runs inside the background service worker so page CSP and CORS never get in the way.
-
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-
-// Free models, tried in order. Free endpoints get rate limited upstream now and then,
-// so if one returns 429 or an empty reply we move on to the next. More entries here
-// means more independent chances to dodge a single provider's congestion — this list
-// deliberately spans several different upstream providers (Nvidia, Google, Alibaba,
-// InclusionAI, dots.llm) so one provider's outage doesn't take down the whole chain.
-// Reasoning-heavy free models are deliberately excluded: several (liquid/lfm-2.5,
-// cohere/north-mini-code) were tested and found to burn their whole token budget on
-// hidden "reasoning" text, returning empty content — worse than just being slow.
-const FREE_MODELS = [
-  'nvidia/nemotron-3-super-120b-a12b:free',
-  'dots-studio/dots-3-note-preview:free',
-  'inclusionai/ling-3.0-flash-sante:free',
-  'google/gemma-4-31b-it:free',
-  'nvidia/nemotron-3-ultra-550b-a55b:free',
-  'qwen/qwen3.8-27b:free'
-];
+// Multi-provider LLM client. Runs inside the background service worker so page CSP and
+// CORS never get in the way. Every provider below returns the same shape — { content,
+// model } on success, a tagged Error on failure — so the hedged-race logic at the
+// bottom works identically no matter which one is picked.
 
 const SYSTEM_PROMPT =
   'You are a strict epistemic auditor. You never rewrite or improve answers. ' +
   'You only analyse how well supported an existing answer is. ' +
   'Reply with a single valid JSON object and nothing else. No markdown fences, no commentary.';
 
-async function callModel(apiKey, model, prompt, signal) {
-  const res = await fetch(OPENROUTER_URL, {
+// 3600 covers one combined call producing all four modes' analyses at once (see
+// modes.js buildCombinedPrompt) — noticeably more than a single-mode reply needed,
+// since it's now doing the work of four.
+const MAX_OUTPUT_TOKENS = 3600;
+
+// ---------------------------------------------------------------------------
+// Providers. Each free tier has a different daily ceiling, so offering more than
+// just OpenRouter matters: OpenRouter's free pool caps around 50 requests/day per
+// account (shared across every free model on it), while Groq and Gemini's own free
+// tiers are, account for account, dramatically higher — see each provider's models
+// list below for the numbers, sourced from their own docs.
+// ---------------------------------------------------------------------------
+
+const PROVIDERS = {
+  openrouter: {
+    label: 'OpenRouter',
+    keyUrl: 'https://openrouter.ai/keys',
+    keyHint: 'sk-or-v1-...',
+    // Deliberately spans several different upstream providers (Nvidia, Google,
+    // Alibaba, InclusionAI, dots.llm) so one provider's outage doesn't take down the
+    // whole chain. Reasoning-heavy free models are deliberately excluded: several
+    // (liquid/lfm-2.5, cohere/north-mini-code) were tested and found to burn their
+    // whole token budget on hidden "reasoning" text, returning empty content —
+    // worse than just being slow.
+    models: [
+      'nvidia/nemotron-3-super-120b-a12b:free',
+      'dots-studio/dots-3-note-preview:free',
+      'inclusionai/ling-3.0-flash-sante:free',
+      'google/gemma-4-31b-it:free',
+      'nvidia/nemotron-3-ultra-550b-a55b:free',
+      'qwen/qwen3.8-27b:free'
+    ],
+    call: callOpenRouter,
+    testKey: testOpenRouterKey
+  },
+  groq: {
+    label: 'Groq',
+    keyUrl: 'https://console.groq.com/keys',
+    keyHint: 'gsk_...',
+    // Groq's free tier is per-model, not one shared daily pool — llama-3.1-8b-instant
+    // alone is good for 14,400 requests/day. Numbers per Groq's own docs, current as
+    // of writing; they revise the roster and limits periodically.
+    models: [
+      'llama-3.1-8b-instant', // 14,400 requests/day, 500K tokens/day
+      'llama-3.3-70b-versatile', // 1,000 requests/day, 100K tokens/day — slower daily cap, stronger model
+      'gemma2-9b-it'
+    ],
+    call: callGroq,
+    testKey: testGroqKey
+  },
+  gemini: {
+    label: 'Google Gemini',
+    keyUrl: 'https://aistudio.google.com/apikey',
+    keyHint: 'AIza...',
+    // 1,500 requests/day per Google's own published free-tier limits (Sep 2026).
+    models: [
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite'
+    ],
+    call: callGemini,
+    testKey: testGeminiKey
+  }
+};
+
+// ---------------------------------------------------------------------------
+// OpenRouter — OpenAI-style chat completions, one shared account-wide daily quota.
+// ---------------------------------------------------------------------------
+
+async function callOpenRouter(apiKey, model, prompt, signal) {
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     signal,
     headers: {
@@ -36,31 +88,25 @@ async function callModel(apiKey, model, prompt, signal) {
     },
     body: JSON.stringify({
       model,
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: prompt }
-      ],
+      messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: prompt }],
       temperature: 0.3,
-      // 3600 covers one combined call producing all four modes' analyses at once
-      // (see modes.js buildCombinedPrompt) — noticeably more than a single-mode
-      // reply needed, since it's now doing the work of four.
-      max_tokens: 3600
+      max_tokens: MAX_OUTPUT_TOKENS
     })
   });
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.error) {
-    const msg = (data.error && data.error.message) || `HTTP ${res.status}`;
-    const err = new Error(msg);
+    const err = new Error((data.error && data.error.message) || `HTTP ${res.status}`);
     err.status = (data.error && data.error.code) || res.status;
     // OpenRouter's free tier caps at a small number of requests PER DAY, shared across
     // every free model on the account — separate from, and much harder than, the
     // per-model "busy right now" 429s hedging is meant to route around. Tag it so
-    // callLLM can give an accurate message instead of "try again in a few seconds",
-    // which is actively wrong here: no amount of retrying helps until the daily reset.
+    // the race logic can give an accurate message instead of "try again in a few
+    // seconds", which is actively wrong here: no amount of retrying helps until reset.
     if (data.error && data.error.metadata && data.error.metadata.limit_source === 'openrouter_free_tier_daily') {
       err.isDailyQuota = true;
       err.resetAt = Number(data.error.metadata.headers && data.error.metadata.headers['X-RateLimit-Reset']) || null;
+      err.upgradeUrl = 'openrouter.ai/settings/credits';
     }
     throw err;
   }
@@ -68,6 +114,101 @@ async function callModel(apiKey, model, prompt, signal) {
   if (!content || !content.trim()) throw new Error('Empty reply');
   return { content, model: data.model || model };
 }
+
+async function testOpenRouterKey(apiKey) {
+  const res = await fetch('https://openrouter.ai/api/v1/key', { headers: { Authorization: `Bearer ${apiKey}` } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return { ok: false, error: (data.error && data.error.message) || `HTTP ${res.status}` };
+  const q = data.data && data.data.free_model_daily_requests;
+  return { ok: true, quota: q ? { used: q.used, limit: q.limit, remaining: q.remaining } : null };
+}
+
+// ---------------------------------------------------------------------------
+// Groq — also OpenAI-style, so this is nearly identical to OpenRouter's, just
+// pointed at Groq's own endpoint and without OpenRouter's daily-quota metadata
+// (Groq's free tier is a plain per-model rate limit, handled like any other 429).
+// ---------------------------------------------------------------------------
+
+async function callGroq(apiKey, model, prompt, signal) {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    signal,
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: prompt }],
+      temperature: 0.3,
+      max_tokens: MAX_OUTPUT_TOKENS
+    })
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) {
+    const err = new Error((data.error && data.error.message) || `HTTP ${res.status}`);
+    err.status = (data.error && data.error.code) || res.status;
+    throw err;
+  }
+  const content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+  if (!content || !content.trim()) throw new Error('Empty reply');
+  return { content, model: data.model || model };
+}
+
+// GET /models costs nothing against the generation quota — just confirms the key works.
+async function testGroqKey(apiKey) {
+  const res = await fetch('https://api.groq.com/openai/v1/models', { headers: { Authorization: `Bearer ${apiKey}` } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return { ok: false, error: (data.error && data.error.message) || `HTTP ${res.status}` };
+  return { ok: true, quota: null }; // Groq doesn't expose remaining quota over the API
+}
+
+// ---------------------------------------------------------------------------
+// Google Gemini — a genuinely different request/response shape: the key rides in
+// the URL's query string (not a header), and content comes back as
+// candidates[0].content.parts[].text instead of choices[0].message.content.
+// ---------------------------------------------------------------------------
+
+function geminiUrl(model, apiKey, action) {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:${action}?key=${encodeURIComponent(apiKey)}`;
+}
+
+async function callGemini(apiKey, model, prompt, signal) {
+  const res = await fetch(geminiUrl(model, apiKey, 'generateContent'), {
+    method: 'POST',
+    signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.3, maxOutputTokens: MAX_OUTPUT_TOKENS }
+    })
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) {
+    const err = new Error((data.error && data.error.message) || `HTTP ${res.status}`);
+    err.status = (data.error && data.error.code) || res.status;
+    // Gemini reports an invalid key as 400/INVALID_ARGUMENT, not 401 like the others.
+    if (data.error && (data.error.status === 'PERMISSION_DENIED' || data.error.status === 'UNAUTHENTICATED')) err.status = 401;
+    throw err;
+  }
+  const parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
+  const content = Array.isArray(parts) ? parts.map(p => p.text || '').join('') : '';
+  if (!content || !content.trim()) throw new Error('Empty reply');
+  return { content, model };
+}
+
+// GET ?key=... on the models list is free — validates the key without spending any
+// generation quota.
+async function testGeminiKey(apiKey) {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return { ok: false, error: (data.error && data.error.message) || `HTTP ${res.status}` };
+  return { ok: true, quota: null }; // Gemini doesn't expose remaining quota over the API
+}
+
+// ---------------------------------------------------------------------------
+// Shared parsing and hedged-race logic — provider-agnostic from here down.
+// ---------------------------------------------------------------------------
 
 // Pull the first JSON object out of a reply, even if the model wrapped it in fences or prose.
 function parseJSON(text) {
@@ -89,17 +230,6 @@ function cancellableDelay(ms, signal) {
   });
 }
 
-// Hedged requests: a well-known technique for tail latency against a flaky pool of
-// workers (see Google's "The Tail at Scale"). Free OpenRouter models get 429'd or go
-// slow unpredictably, and trying them one at a time serially means a single stuck
-// model blocks everything behind it — that's what made this feel "genuinely shaky"
-// in testing (25-30s waits weren't unusual). Instead: fire the first (best-performing)
-// model immediately, and if it hasn't answered within HEDGE_DELAY_MS, fire the next
-// one too — without cancelling the first. Whichever model answers with valid JSON
-// first wins, and every other in-flight request is aborted immediately, so this never
-// costs more real network traffic than the old serial approach in the common case
-// (one model answering promptly), and it only parallelizes — never serializes — the
-// slow case.
 const HEDGE_DELAY_MS = 2500;
 
 // Sentinels Promise.any can *fulfil* on, so certain failures short-circuit the whole
@@ -111,14 +241,25 @@ const HEDGE_DELAY_MS = 2500;
 const AUTH_FAILURE = Symbol('auth-failure');
 const DAILY_QUOTA_EXHAUSTED = Symbol('daily-quota-exhausted');
 
-async function callLLM(apiKey, prompt, preferredModel, hedgeDelayMs = HEDGE_DELAY_MS) {
-  const models = preferredModel && preferredModel !== 'auto'
-    ? [preferredModel, ...FREE_MODELS.filter(m => m !== preferredModel)]
-    : FREE_MODELS;
-
+/**
+ * Hedged requests: a well-known technique for tail latency against a flaky pool of
+ * workers (see Google's "The Tail at Scale"). Free-tier models get 429'd or go slow
+ * unpredictably, and trying them one at a time serially means a single stuck model
+ * blocks everything behind it. Instead: fire the first (best-performing) model
+ * immediately, and if it hasn't answered within hedgeDelayMs, fire the next one too —
+ * without cancelling the first. Whichever model answers with valid JSON first wins,
+ * and every other in-flight request is aborted immediately, so this never costs more
+ * real network traffic than a serial approach in the common case (one model
+ * answering promptly), and it only parallelizes — never serializes — the slow case.
+ *
+ * `callModel(apiKey, model, prompt, signal)` must resolve `{content, model}` or throw
+ * an Error, optionally tagged `.status` (401 short-circuits as an auth failure) or
+ * `.isDailyQuota` (short-circuits as an unrecoverable-today quota failure).
+ */
+async function raceModels(callModel, apiKey, models, prompt, hedgeDelayMs) {
   const failures = [];
   const controllers = models.map(() => new AbortController());
-  let resetAt = null;
+  let resetAt = null, upgradeUrl = null;
 
   const attempt = async (model, i) => {
     if (i > 0) await cancellableDelay(i * hedgeDelayMs, controllers[i].signal); // wait its turn to hedge in
@@ -130,7 +271,7 @@ async function callLLM(apiKey, prompt, preferredModel, hedgeDelayMs = HEDGE_DELA
       if (err.name === 'AbortError') throw err; // a winner elsewhere cancelled us; not a real failure
       failures.push(`${model}: ${err.message}`);
       if (err.status === 401) return AUTH_FAILURE; // fulfil (not reject) to win the race instantly
-      if (err.isDailyQuota) { resetAt = err.resetAt; return DAILY_QUOTA_EXHAUSTED; }
+      if (err.isDailyQuota) { resetAt = err.resetAt; upgradeUrl = err.upgradeUrl; return DAILY_QUOTA_EXHAUSTED; }
       throw err;
     }
   };
@@ -138,20 +279,45 @@ async function callLLM(apiKey, prompt, preferredModel, hedgeDelayMs = HEDGE_DELA
   try {
     const winner = await Promise.any(models.map((model, i) => attempt(model, i)));
     if (winner === AUTH_FAILURE) throw Object.assign(new Error('auth'), { isAuthFailure: true });
-    if (winner === DAILY_QUOTA_EXHAUSTED) throw Object.assign(new Error('quota'), { isDailyQuota: true, resetAt });
+    if (winner === DAILY_QUOTA_EXHAUSTED) throw Object.assign(new Error('quota'), { isDailyQuota: true, resetAt, upgradeUrl });
     controllers.forEach(c => c.abort());
     return winner;
   } catch (err) {
     controllers.forEach(c => c.abort());
-    if (err.isAuthFailure) throw new Error('OpenRouter rejected the API key. Check it in the extension settings.');
+    if (err.isAuthFailure) throw new Error('This key was rejected. Check it in the extension settings.');
     if (err.isDailyQuota) {
       const when = err.resetAt ? ` (resets ${new Date(err.resetAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})` : '';
       throw new Error(
         `This key has used up its free requests for today${when}. Retrying won't help until the reset. ` +
-        'Add a small amount of credit at openrouter.ai/settings/credits to raise the daily free-model limit, ' +
-        'or switch to a different OpenRouter key in the extension settings.'
+        (err.upgradeUrl ? `Add a small amount of credit at ${err.upgradeUrl} to raise the daily free-model limit, or ` : '') +
+        'switch to a different provider or key in the extension settings.'
       );
     }
     throw new Error('All free models failed right now. Try again in a few seconds.\n' + failures.join('\n'));
+  }
+}
+
+/**
+ * The entry point background.js calls. `settings` is `{ provider, apiKey, model }` —
+ * `model` of `'auto'` (or anything falsy) races the whole provider's free-model list;
+ * a specific model name puts it first, still with the rest of that provider's list
+ * as hedges behind it, rather than being a hard pin with no fallback at all.
+ */
+async function callLLM(settings, prompt, hedgeDelayMs = HEDGE_DELAY_MS) {
+  const provider = PROVIDERS[settings.provider] || PROVIDERS.openrouter;
+  const models = settings.model && settings.model !== 'auto'
+    ? [settings.model, ...provider.models.filter(m => m !== settings.model)]
+    : provider.models;
+  return raceModels(provider.call, settings.apiKey, models, prompt, hedgeDelayMs);
+}
+
+/** Validates a key against whichever provider it's meant for, with no generation cost. */
+async function testProviderKey(providerId, apiKey) {
+  const provider = PROVIDERS[providerId] || PROVIDERS.openrouter;
+  if (!apiKey) return { ok: false, error: 'Paste a key first.' };
+  try {
+    return await provider.testKey(apiKey);
+  } catch (err) {
+    return { ok: false, error: `Could not reach ${provider.label}: ${err.message}` };
   }
 }

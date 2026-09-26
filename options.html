@@ -21,30 +21,45 @@
     #keyStatus.error { color: #d6453d; }
     #status { color: #1f9d55; }
     small { color: #777; }
+    .provider-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+    .provider-card {
+      border: 2px solid #ddd; border-radius: 10px; padding: 10px; cursor: pointer; text-align: center; font-size: 13px;
+    }
+    .provider-card.active { border-color: #5b3df5; background: #f4f1ff; }
+    .provider-card b { display: block; font-size: 14px; margin-bottom: 2px; }
+    .provider-card span { color: #777; font-size: 12px; }
   </style>
 </head>
 <body>
   <h1>Argue Back</h1>
-  <p>Paste an OpenRouter key once. It stays in your browser storage and is only ever sent to openrouter.ai.</p>
+  <p>Pick a provider, paste its key once. It stays in your browser storage and is only ever sent to that provider.</p>
 
-  <label for="apiKey">OpenRouter API key</label>
+  <label>Provider</label>
+  <div class="provider-grid" id="providerGrid">
+    <div class="provider-card" data-provider="openrouter">
+      <b>OpenRouter</b>
+      <span>~50 free req/day</span>
+    </div>
+    <div class="provider-card" data-provider="groq">
+      <b>Groq</b>
+      <span>up to 14,400/day</span>
+    </div>
+    <div class="provider-card" data-provider="gemini">
+      <b>Gemini</b>
+      <span>1,500/day</span>
+    </div>
+  </div>
+
+  <label for="apiKey">API key <span id="keyProviderLabel"></span></label>
   <div class="key-row">
-    <input id="apiKey" type="password" placeholder="sk-or-v1-..." autocomplete="off">
+    <input id="apiKey" type="password" placeholder="" autocomplete="off">
     <button id="testKey" class="secondary" type="button">Test key</button>
   </div>
   <div id="keyStatus"></div>
-  <small>Get one free at openrouter.ai/keys</small>
+  <small id="keyHint"></small>
 
   <label for="model">Model</label>
-  <select id="model">
-    <option value="auto">Auto (races several free models, fastest reply wins)</option>
-    <option value="nvidia/nemotron-3-super-120b-a12b:free">Nemotron 3 Super 120B (free)</option>
-    <option value="dots-studio/dots-3-note-preview:free">Dots 3 Note Preview (free)</option>
-    <option value="inclusionai/ling-3.0-flash-sante:free">Ling 3.0 Flash Sante (free)</option>
-    <option value="google/gemma-4-31b-it:free">Gemma 4 31B (free)</option>
-    <option value="nvidia/nemotron-3-ultra-550b-a55b:free">Nemotron 3 Ultra 550B (free)</option>
-    <option value="qwen/qwen3.8-27b:free">Qwen 3.8 27B (free)</option>
-  </select>
+  <select id="model"></select>
 
   <div class="actions">
     <button id="save">Save</button>
@@ -52,6 +67,7 @@
     <span id="status"></span>
   </div>
 
+  <script src="llm_client.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

@@ -224,8 +224,13 @@ test('combined fixture: a mode key missing entirely still renders (falls back to
 {
   const llmSrc = fs.readFileSync(path.join(root, 'llm_client.js'), 'utf8');
   var LLM = {};
-  new Function('exports', llmSrc + '\nexports.parseJSON = parseJSON; exports.callLLM = callLLM; exports.FREE_MODELS = FREE_MODELS;')(LLM);
+  new Function('exports', llmSrc +
+    '\nexports.parseJSON = parseJSON; exports.callLLM = callLLM; exports.PROVIDERS = PROVIDERS; ' +
+    'exports.testProviderKey = testProviderKey; exports.callOpenRouter = callOpenRouter; ' +
+    'exports.callGroq = callGroq; exports.callGemini = callGemini;')(LLM);
 }
+
+const or = (model) => ({ provider: 'openrouter', apiKey: 'fake-key', model });
 
 test('parseJSON: parses a clean JSON object', () => {
   assert.deepStrictEqual(LLM.parseJSON('{"ok":true}'), { ok: true });
@@ -247,33 +252,51 @@ test('parseJSON: throws a clear error on genuinely non-JSON output', () => {
   assert.throws(() => LLM.parseJSON('I cannot help with that.'), /did not return JSON/);
 });
 
-// These three share `global.fetch` as their mock point, so they run as one sequential
-// async test rather than three separate ones — three separate `test()` calls would fire
+test('PROVIDERS: all three are registered with a call fn, a test-key fn, and a model list', () => {
+  for (const id of ['openrouter', 'groq', 'gemini']) {
+    const p = LLM.PROVIDERS[id];
+    assert(p, `missing provider "${id}"`);
+    assert(typeof p.call === 'function');
+    assert(typeof p.testKey === 'function');
+    assert(Array.isArray(p.models) && p.models.length > 0);
+  }
+});
+
+// These four share `global.fetch` as their mock point, so they run as one sequential
+// async test rather than four separate ones — separate `test()` calls would fire
 // concurrently (test() doesn't await), and whichever mock got assigned last would win
-// for all three, silently corrupting whichever ran its real request after the reassignment.
-test('callLLM: hedging, total failure, and auth errors', async () => {
-  // 1) The first model hangs forever; the second (hedged in after HEDGE_DELAY_MS) answers
+// for all of them, silently corrupting whichever ran its real request after the
+// reassignment.
+// All of these share `global.fetch` as their mock point, so — same lesson learned
+// earlier in this file — they run as ONE sequential async test, not several. Separate
+// `test()` calls fire concurrently (test() doesn't await), and whichever mock got
+// assigned last would silently win for every one of them, corrupting the results of
+// any that had a real request still in flight when the reassignment happened.
+test('callLLM and each provider adapter: hedging, failures, and provider-specific shapes', async () => {
+  const models = LLM.PROVIDERS.openrouter.models;
+
+  // 1) The first model hangs forever; the second (hedged in after hedgeDelayMs) answers
   //    correctly. The hung model's request must be the one that gets aborted, not the winner.
   global.fetch = async (url, opts) => {
     const body = JSON.parse(opts.body);
-    if (body.model === LLM.FREE_MODELS[0]) {
+    if (body.model === models[0]) {
       return new Promise((_resolve, reject) => {
         opts.signal.addEventListener('abort', () => reject(new Error('aborted')));
       });
     }
     return { ok: true, json: async () => ({ choices: [{ message: { content: '{"decay":{}}' } }], model: body.model }) };
   };
-  const result = await LLM.callLLM('fake-key', 'prompt', 'auto', 20);
+  const result = await LLM.callLLM(or('auto'), 'prompt', 20);
   assert.deepStrictEqual(result.json, { decay: {} });
-  assert.notStrictEqual(result.model, LLM.FREE_MODELS[0]);
+  assert.notStrictEqual(result.model, models[0]);
 
   // 2) Every model fails the same way — a clear, actionable error, not a hang or a crash.
   global.fetch = async () => ({ ok: false, status: 500, json: async () => ({ error: { message: 'boom' } }) });
-  await assert.rejects(() => LLM.callLLM('fake-key', 'prompt', 'auto', 20), /All free models failed/);
+  await assert.rejects(() => LLM.callLLM(or('auto'), 'prompt', 20), /All free models failed/);
 
   // 3) A 401 should short-circuit with a specific "check your key" message, not the generic one.
   global.fetch = async () => ({ ok: false, status: 401, json: async () => ({ error: { message: 'Unauthorized', code: 401 } }) });
-  await assert.rejects(() => LLM.callLLM('bad-key', 'prompt', 'auto', 20), /rejected the API key/);
+  await assert.rejects(() => LLM.callLLM(or('auto'), 'prompt', 20), /was rejected/);
 
   // 4) An exhausted daily free-tier quota (real shape, confirmed against OpenRouter live)
   //    must also short-circuit instantly, and must say "retrying won't help", not the
@@ -289,7 +312,40 @@ test('callLLM: hedging, total failure, and auth errors', async () => {
       }
     })
   });
-  await assert.rejects(() => LLM.callLLM('fake-key', 'prompt', 'auto', 20), /won't help until the reset/);
+  await assert.rejects(() => LLM.callLLM(or('auto'), 'prompt', 20), /won't help until the reset/);
+
+  // 5) Groq: same OpenAI-shaped request/response as OpenRouter, just a different host.
+  global.fetch = async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: '{"ok":true}' } }], model: 'llama-3.1-8b-instant' }) });
+  const groqOk = await LLM.callGroq('gsk_fake', 'llama-3.1-8b-instant', 'prompt', new AbortController().signal);
+  assert.deepStrictEqual(LLM.parseJSON(groqOk.content), { ok: true });
+
+  global.fetch = async () => ({ ok: false, status: 401, json: async () => ({ error: { message: 'Invalid API Key' } }) });
+  await assert.rejects(() => LLM.callGroq('bad', 'llama-3.1-8b-instant', 'prompt', new AbortController().signal), /Invalid API Key/);
+
+  // 6) Gemini: a genuinely different shape — key in the query string, content nested
+  //    under candidates[].content.parts[], not choices[].message.content.
+  global.fetch = async (url) => {
+    assert(url.includes('generateContent'), 'should hit the generateContent action');
+    assert(url.includes('key='), 'the key belongs in the query string for Gemini, not a header');
+    return { ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }] }) };
+  };
+  const geminiOk = await LLM.callGemini('AIzafake', 'gemini-2.5-flash', 'prompt', new AbortController().signal);
+  assert.deepStrictEqual(LLM.parseJSON(geminiOk.content), { ok: true });
+
+  // Gemini reports a bad key as 400/PERMISSION_DENIED, not a plain 401 — must still map to auth failure.
+  global.fetch = async () => ({ ok: false, status: 400, json: async () => ({ error: { message: 'API key not valid', status: 'PERMISSION_DENIED' } }) });
+  try {
+    await LLM.callGemini('bad', 'gemini-2.5-flash', 'prompt', new AbortController().signal);
+    assert.fail('expected callGemini to throw on a bad key');
+  } catch (err) {
+    assert.strictEqual(err.status, 401);
+  }
+});
+
+test('testProviderKey: reports a missing key without making a network call', async () => {
+  const res = await LLM.testProviderKey('groq', '');
+  assert.strictEqual(res.ok, false);
+  assert.match(res.error, /Paste a key/);
 });
 
 // ---------------------------------------------------------------------------
