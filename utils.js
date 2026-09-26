@@ -129,7 +129,8 @@ AB.extractQuestion = (answerEl) => {
 
 AB.findInputBox = () => (AB.site ? document.querySelector(AB.site.input) : null);
 
-// Short stable hash so cache keys stay small.
+// A small, fast string hash (cyrb53-family: two 32-bit mixing lanes combined into one
+// number) — not cryptographic, just short and stable, so cache keys stay small.
 AB.hash = (str) => {
   let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
   for (let i = 0; i < str.length; i++) {
@@ -175,6 +176,13 @@ AB.truncate = (s, n) => (s && s.length > n ? s.slice(0, n - 1).trimEnd() + '…'
 
 AB.highlights = new Map(); // highlight name -> Map(answerEl -> Range[])
 
+/**
+ * Flattens all the visible text under `root` into one string, plus a lookup table
+ * (`map`) recording which DOM text node each character range came from. This is what
+ * lets rangeAt() below turn a plain character offset back into a real DOM Range —
+ * highlighting needs actual Range objects, but everything upstream (regex matching,
+ * sentence search) only ever deals in plain string offsets.
+ */
 AB.buildTextIndex = (root) => {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode: (n) => (n.parentElement && n.parentElement.closest('pre, .ab-root')
@@ -190,6 +198,7 @@ AB.buildTextIndex = (root) => {
   return { text, map };
 };
 
+/** Converts a [start, end) character offset in `index.text` into a real DOM Range. */
 AB.rangeAt = (index, start, end) => {
   // Start positions belong to the node they begin; end positions to the node they close.
   const locate = (pos, isEnd) => {
@@ -209,7 +218,13 @@ AB.rangeAt = (index, start, end) => {
   return r;
 };
 
-// Find a sentence in the live DOM text, tolerant of whitespace differences.
+/**
+ * Finds a model-quoted sentence inside the live DOM text and returns its Range.
+ * Built as a regex with each word escaped and `\s*` joining them, rather than a plain
+ * substring search, because the model's own copy of a sentence rarely matches the
+ * page byte-for-byte (curly quotes, double spaces, a stray line break the site
+ * inserted) — this tolerates all of that while still requiring the actual words.
+ */
 AB.findSentenceRange = (index, sentence) => {
   const words = sentence.trim().split(/\s+/).slice(0, 40).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
   if (!words.length) return null;
@@ -217,6 +232,12 @@ AB.findSentenceRange = (index, sentence) => {
   return m ? AB.rangeAt(index, m.index, m.index + m[0].length) : null;
 };
 
+/**
+ * Paints one named set of ranges (e.g. "ab-know") over `answerEl` using the CSS
+ * Custom Highlight API — never touching the underlying DOM. Each highlight name
+ * tracks ranges per answer element so multiple answers on one page (a long chat
+ * thread) don't bleed into each other; a no-op if the browser lacks the API.
+ */
 AB.setHighlights = (name, answerEl, ranges) => {
   if (!window.CSS || !CSS.highlights || typeof Highlight === 'undefined') return;
   if (!AB.highlights.has(name)) AB.highlights.set(name, new Map());

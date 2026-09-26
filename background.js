@@ -28,6 +28,24 @@ async function writeCache(key, value) {
   await chrome.storage.local.set({ cache });
 }
 
+// Validates a key with a plain GET — no chat completion, no tokens spent, no dent in
+// the daily free-model quota it's there to report on in the first place.
+async function handleTestKey({ apiKey }) {
+  if (!apiKey) return { ok: false, error: 'Paste a key first.' };
+  let res;
+  try {
+    res = await fetch('https://openrouter.ai/api/v1/key', { headers: { Authorization: `Bearer ${apiKey}` } });
+  } catch (err) {
+    return { ok: false, error: `Could not reach OpenRouter: ${err.message}` };
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { ok: false, error: (data.error && data.error.message) || `OpenRouter rejected this key (HTTP ${res.status}).` };
+  }
+  const quota = data.data && data.data.free_model_daily_requests;
+  return { ok: true, quota: quota ? { used: quota.used, limit: quota.limit, remaining: quota.remaining } : null };
+}
+
 async function handleAnalyze({ cacheKey, prompt }) {
   const hit = await readCache(cacheKey);
   if (hit) return { ok: true, result: hit.result, model: hit.model, cached: true };
@@ -51,6 +69,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   }
   if (msg && msg.type === 'openOptions') {
     chrome.runtime.openOptionsPage();
+  }
+  if (msg && msg.type === 'testKey') {
+    handleTestKey(msg)
+      .then(sendResponse)
+      .catch(err => sendResponse({ ok: false, error: err.message }));
+    return true;
   }
 });
 

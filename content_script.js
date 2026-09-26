@@ -13,6 +13,12 @@
   // Scorecard
   // ---------------------------------------------------------------------------
 
+  /**
+   * Turns the raw per-sentence audit data (from "The Guess, Highlighted") into the
+   * three percentages and the average confidence shown on the scorecard bar.
+   * Sentences are weighted by word count, so one long guessy paragraph outweighs a
+   * short "yes." — a straight count of sentences would treat those as equal.
+   */
   function computeScorecard(auditData, local) {
     const totals = { KNOW: 0, INFER: 0, GUESS: 0 };
     let confSum = 0, weightSum = 0;
@@ -72,6 +78,7 @@
   // Inline annotation on the original answer (non destructive)
   // ---------------------------------------------------------------------------
 
+  /** Underlines every hedge word in the live answer, in place, via the Highlight API. */
   function annotateHedges(answerEl) {
     const index = AB.buildTextIndex(answerEl);
     const ranges = [];
@@ -81,6 +88,7 @@
     AB.setHighlights('ab-hedge', answerEl, ranges);
   }
 
+  /** Color-codes each know/infer/guess sentence in the live answer, in place. */
   function annotateSentences(answerEl, auditData, local) {
     const index = AB.buildTextIndex(answerEl);
     const groups = { KNOW: [], INFER: [], GUESS: [] };
@@ -99,12 +107,37 @@
   // Running a mode
   // ---------------------------------------------------------------------------
 
+  /** Pulls the answer text, its question, and a fresh local (non-LLM) analysis of it. */
   function context(answerEl) {
     const answer = AB.extractAnswerText(answerEl);
     const question = answerEl.dataset.abQuestion || AB.extractQuestion(answerEl);
     return { answer, question, local: AB.analyzer.analyze(answer) };
   }
 
+  // One request covers all four modes (see modes.js buildCombinedPrompt). Clicking
+  // through Decay, Graveyard, Rebuild and Guess Highlighted on the same answer costs
+  // one OpenRouter call total, not four — one shot at a rate limit instead of four,
+  // and every mode after the first is instant.
+  async function ensureCombined(entry) {
+    const { state } = entry;
+    if (state.combined) return state.combined;
+    if (state.combinedPromise) return state.combinedPromise;
+    const ctx = state.ctx;
+    const prompt = AB.buildCombinedPrompt(ctx.answer, ctx.question, ctx.local);
+    const key = AB.cacheKey('combined', ctx.answer, ctx.question);
+    state.combinedPromise = AB.sendAnalyze(key, prompt).then((res) => {
+      state.combinedPromise = null;
+      if (res.ok) state.combined = res;
+      return res;
+    });
+    return state.combinedPromise;
+  }
+
+  /**
+   * Shows the loading/result/error state for one mode button. Reuses the combined
+   * result once it exists (see ensureCombined above), so only the very first mode
+   * clicked on a given answer ever waits on the network.
+   */
   async function runMode(answerEl, entry, modeId) {
     const mode = AB.MODE_BY_ID[modeId];
     const { state, root } = entry;
@@ -120,14 +153,14 @@
       return;
     }
 
-    if (state.results[modeId]) {
-      showResult(answerEl, entry, modeId, state.results[modeId]);
+    if (state.combined) {
+      showResult(answerEl, entry, modeId, sliceFor(modeId, state.combined));
       return;
     }
 
     output.replaceChildren(el('div', { class: 'ab-loading' }, [el('span', { class: 'ab-spinner' }), `${mode.label}: taking the answer apart…`]));
 
-    const res = await AB.sendAnalyze(AB.cacheKey(modeId, ctx.answer, ctx.question), mode.buildPrompt(ctx.answer, ctx.question, ctx.local));
+    const res = await ensureCombined(entry);
     if (!res.ok) {
       if (state.activeMode !== modeId) return;
       const err = el('div', { class: 'ab-error' }, [el('div', { text: res.error }), el('button', { class: 'ab-link', text: 'Retry', onclick: () => runMode(answerEl, entry, modeId) })]);
@@ -135,10 +168,20 @@
       output.replaceChildren(err);
       return;
     }
-    state.results[modeId] = res;
-    if (state.activeMode === modeId) showResult(answerEl, entry, modeId, res);
+    if (state.activeMode === modeId) showResult(answerEl, entry, modeId, sliceFor(modeId, res));
   }
 
+  // Pulls one mode's slice out of the combined result, in the shape showResult expects.
+  function sliceFor(modeId, res) {
+    return { result: (res.result && res.result[modeId]) || {}, model: res.model, cached: res.cached };
+  }
+
+  /**
+   * Renders one mode's output into the panel. Wrapped in try/catch: a mode's render()
+   * throwing on unexpected model output degrades to an inline error instead of leaving
+   * the whole extension in a broken state (this is also directly covered by the
+   * fixture tests in tests/run.js — see the "render() survives fixture" cases there).
+   */
   function showResult(answerEl, entry, modeId, res) {
     const mode = AB.MODE_BY_ID[modeId];
     const { state, root } = entry;
@@ -184,8 +227,9 @@
   // Injection
   // ---------------------------------------------------------------------------
 
+  /** Builds one answer's Argue Back bar (button + panel), not yet attached to the page. */
   function buildBar(answerEl) {
-    const entry = { state: { results: {}, ctx: null, activeMode: null } };
+    const entry = { state: { combined: null, combinedPromise: null, ctx: null, activeMode: null } };
     const modeButtons = AB.MODES.map(m =>
       el('button', { class: 'ab-mode', 'data-mode': m.id, title: m.blurb, text: m.label, onclick: () => runMode(answerEl, entry, m.id) }));
 
@@ -209,6 +253,13 @@
     return entry;
   }
 
+  /**
+   * Scans the page for finished answers and attaches a bar to each one that doesn't
+   * already have a live bar attached. Called on a debounced MutationObserver tick
+   * (see the bottom of this file), so it runs often — cheap by design: `bars` (a
+   * WeakMap) skips any answer already handled, and streaming answers are skipped
+   * entirely via isStreaming() until the site reports the reply is done.
+   */
   function injectAll() {
     if (AB.site.isStreaming()) return;
     for (const answerEl of AB.findAnswers()) {
@@ -225,6 +276,11 @@
   // Any website: right click selected text, get a floating Argue Back panel.
   // ---------------------------------------------------------------------------
 
+  /**
+   * The universal fallback: a self-contained "answer" built from selected text, with
+   * its own bar, floating over whatever page it was invoked from (see background.js's
+   * context menu handler, which injects this whole bundle of scripts on demand).
+   */
   function openFloating(text) {
     document.querySelector('.ab-float')?.remove();
     const answerEl = el('div', { class: 'ab-float-answer' },

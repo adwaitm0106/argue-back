@@ -93,6 +93,13 @@
     return out;
   }
 
+  /**
+   * The single entry point everything else calls: runs every local check above once
+   * and bundles the results into one object. This is `ctx.local` throughout the rest
+   * of the extension (content_script.js, modes.js) — the "instant scan" strip, the
+   * scorecard math, and every mode's prompt all read from what this returns, so its
+   * sentence indices are the shared numbering scheme the LLM prompts refer to.
+   */
   function analyze(text) {
     const sentences = splitSentences(text);
     const claims = extractClaims(text);

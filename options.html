@@ -9,9 +9,17 @@
     p { color: #555; }
     label { display: block; font-weight: 600; margin: 20px 0 6px; }
     input, select { width: 100%; padding: 8px 10px; font: inherit; border: 1px solid #ccc; border-radius: 8px; }
-    button { margin-top: 20px; padding: 8px 16px; font: inherit; border-radius: 8px; border: 0; background: #5b3df5; color: #fff; cursor: pointer; }
-    button.secondary { background: #eee; color: #222; margin-left: 8px; }
-    #status { margin-left: 10px; color: #1f9d55; }
+    .key-row { display: flex; gap: 8px; align-items: center; }
+    .key-row input { flex: 1; }
+    button { padding: 8px 16px; font: inherit; border-radius: 8px; border: 0; background: #5b3df5; color: #fff; cursor: pointer; white-space: nowrap; }
+    button.secondary { background: #eee; color: #222; }
+    button:disabled { opacity: .6; cursor: default; }
+    .actions { margin-top: 20px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    #keyStatus { margin-top: 8px; font-size: 13.5px; min-height: 1.4em; }
+    #keyStatus.ok { color: #1f9d55; }
+    #keyStatus.warn { color: #c58a00; }
+    #keyStatus.error { color: #d6453d; }
+    #status { color: #1f9d55; }
     small { color: #777; }
   </style>
 </head>
@@ -20,19 +28,25 @@
   <p>Paste an OpenRouter key once. It stays in your browser storage and is only ever sent to openrouter.ai.</p>
 
   <label for="apiKey">OpenRouter API key</label>
-  <input id="apiKey" type="password" placeholder="sk-or-v1-..." autocomplete="off">
+  <div class="key-row">
+    <input id="apiKey" type="password" placeholder="sk-or-v1-..." autocomplete="off">
+    <button id="testKey" class="secondary" type="button">Test key</button>
+  </div>
+  <div id="keyStatus"></div>
   <small>Get one free at openrouter.ai/keys</small>
 
   <label for="model">Model</label>
   <select id="model">
-    <option value="auto">Auto (best free model, falls back if busy)</option>
+    <option value="auto">Auto (races several free models, fastest reply wins)</option>
     <option value="nvidia/nemotron-3-super-120b-a12b:free">Nemotron 3 Super 120B (free)</option>
+    <option value="dots-studio/dots-3-note-preview:free">Dots 3 Note Preview (free)</option>
+    <option value="inclusionai/ling-3.0-flash-sante:free">Ling 3.0 Flash Sante (free)</option>
     <option value="google/gemma-4-31b-it:free">Gemma 4 31B (free)</option>
-    <option value="qwen/qwen3.8-27b:free">Qwen 3.8 27B (free)</option>
     <option value="nvidia/nemotron-3-ultra-550b-a55b:free">Nemotron 3 Ultra 550B (free)</option>
+    <option value="qwen/qwen3.8-27b:free">Qwen 3.8 27B (free)</option>
   </select>
 
-  <div>
+  <div class="actions">
     <button id="save">Save</button>
     <button id="clear" class="secondary">Clear cached results</button>
     <span id="status"></span>

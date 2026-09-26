@@ -184,3 +184,5 @@
 .ab-rebuild-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
 .ab-rebuild-text { padding: 10px 12px; background: var(--ab-soft); border-radius: 10px; }
 .ab-rebuild-text.ab-rebuild-in, .ab-rebuild-text { animation: ab-in .3s ease-out; }
+
+.ab-grave-disclosure { font-size: 12px; font-style: italic; color: var(--ab-muted); margin: 2px 0 8px; }

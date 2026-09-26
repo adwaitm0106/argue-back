@@ -46,73 +46,105 @@
       '  "keep_count": how many of the trailing (most essential) sentences form the real answer, usually 1 or 2\n}',
     render: (data, ctx) => {
       const sentences = ctx.local.sentences;
-      const order = Array.isArray(data.order) ? data.order.filter(i => Number.isInteger(i) && sentences[i]) : [];
-      // Fill in anything the model dropped so every sentence still gets accounted for.
-      for (let i = 0; i < sentences.length; i++) if (!order.includes(i)) order.unshift(i);
-      const keepCount = Math.min(Math.max(1, Number(data.keep_count) || 1), sentences.length);
-      const toDelete = order.slice(0, Math.max(0, order.length - keepCount));
+      const plan = computeDecayPlan(data, sentences, ctx.local.words);
+      const timing = computeDecayTiming(plan.toDelete.length);
+      const dom = buildDecayDOM(sentences, plan.totalWords);
 
-      const totalWords = ctx.local.words || sentences.reduce((n, s) => n + wc(s), 0);
-      const counter = el('div', { class: 'ab-decay-counter' }, `${totalWords} words`);
-      const replay = el('button', { class: 'ab-link ab-decay-replay', text: '↻ Replay the decay' });
-      const body = el('div', { class: 'ab-decay-body' },
-        sentences.map((s, i) => el('span', { class: 'ab-decay-sent', 'data-i': i }, s + ' ')));
-      const wrap = el('div', { class: 'ab-decay' }, [
-        el('div', { class: 'ab-decay-head' }, [el('span', { text: 'Watch the filler die.' }), counter]),
-        body,
-        replay
-      ]);
-
-      // Pace the whole sequence to a roughly fixed watch time regardless of answer length:
-      // a 4-sentence answer and a 40-sentence answer should both finish decaying in a few
-      // seconds, one dramatically slow, the other snappy but still readable step by step.
-      const TARGET_TOTAL_MS = 6500;
-      const MIN_STEP_MS = 110, MAX_STEP_MS = 650;
-      const MAX_STEPS = 24; // beyond this, delete in small batches per tick instead of one at a time
-      const batchSize = Math.max(1, Math.ceil(toDelete.length / MAX_STEPS));
-      const stepCount = Math.max(1, Math.ceil(toDelete.length / batchSize));
-      const stepDelay = Math.min(MAX_STEP_MS, Math.max(MIN_STEP_MS, TARGET_TOTAL_MS / stepCount));
-      const dyingMs = Math.round(Math.min(420, Math.max(140, stepDelay * 0.7)));
-
-      let remaining = totalWords;
-      let timer = null;
-      const play = () => {
-        clearTimeout(timer);
-        remaining = totalWords;
-        counter.textContent = `${remaining} words`;
-        counter.classList.remove('ab-decay-done');
-        body.querySelectorAll('.ab-decay-sent').forEach(n => { n.classList.remove('ab-decay-dead', 'ab-decay-kept'); n.style.transitionDuration = ''; });
-        let cursor = 0;
-        const tick = () => {
-          if (cursor >= toDelete.length) {
-            body.querySelectorAll('.ab-decay-sent').forEach(n => { if (!n.classList.contains('ab-decay-dead')) n.classList.add('ab-decay-kept'); });
-            counter.classList.add('ab-decay-done');
-            counter.textContent = `${totalWords} words → ${remaining} words`;
-            return;
-          }
-          const batch = toDelete.slice(cursor, cursor + batchSize);
-          cursor += batchSize;
-          for (const i of batch) {
-            const node = body.querySelector(`.ab-decay-sent[data-i="${i}"]`);
-            if (!node) continue;
-            node.style.transitionDuration = `${dyingMs}ms`;
-            node.classList.add('ab-decay-dying');
-            remaining = Math.max(0, remaining - wc(sentences[i]));
-            setTimeout(() => node.classList.add('ab-decay-dead'), dyingMs);
-          }
-          counter.textContent = `${remaining} words`;
-          timer = setTimeout(tick, stepDelay);
-        };
-        timer = setTimeout(tick, Math.max(300, stepDelay * 0.8));
-      };
-      replay.addEventListener('click', play);
+      const play = () => runDecayAnimation(dom, sentences, plan, timing);
+      dom.replay.addEventListener('click', play);
       // Auto-start once this node is actually in the document. A plain timer, not
       // requestAnimationFrame: browsers freeze rAF on a background or hidden tab, and a
       // demo audience's tab focus is exactly the kind of thing we can't rely on.
       setTimeout(play, 60);
-      return wrap;
+      return dom.wrap;
     }
   };
+
+  // Which sentences to delete, and in what order. Pure calculation, no DOM, so it's
+  // trivial to unit-test against off-schema model output (see tests/run.js fixtures).
+  function computeDecayPlan(data, sentences, totalWordsHint) {
+    const order = Array.isArray(data.order) ? data.order.filter(i => Number.isInteger(i) && sentences[i]) : [];
+    // Fill in anything the model dropped so every sentence still gets accounted for,
+    // treating omissions as "least essential" (deleted first).
+    for (let i = 0; i < sentences.length; i++) if (!order.includes(i)) order.unshift(i);
+    const keepCount = Math.min(Math.max(1, Number(data.keep_count) || 1), sentences.length);
+    const toDelete = order.slice(0, Math.max(0, order.length - keepCount));
+    const totalWords = totalWordsHint || sentences.reduce((n, s) => n + wc(s), 0);
+    return { toDelete, totalWords };
+  }
+
+  // Pace the whole sequence to a roughly fixed watch time regardless of answer length: a
+  // 4-sentence answer and a 40-sentence answer should both finish decaying in a few
+  // seconds — one dramatically slow, the other snappy but still readable step by step.
+  function computeDecayTiming(deleteCount) {
+    const TARGET_TOTAL_MS = 6500;
+    const MIN_STEP_MS = 110, MAX_STEP_MS = 650;
+    const MAX_STEPS = 24; // beyond this, delete in small batches per tick instead of one at a time
+    const batchSize = Math.max(1, Math.ceil(deleteCount / MAX_STEPS));
+    const stepCount = Math.max(1, Math.ceil(deleteCount / batchSize));
+    const stepDelay = Math.min(MAX_STEP_MS, Math.max(MIN_STEP_MS, TARGET_TOTAL_MS / stepCount));
+    const dyingMs = Math.round(Math.min(420, Math.max(140, stepDelay * 0.7)));
+    return { batchSize, stepDelay, dyingMs };
+  }
+
+  // The static markup: a counter, the sentence-by-sentence body, and a replay button.
+  function buildDecayDOM(sentences, totalWords) {
+    const counter = el('div', { class: 'ab-decay-counter' }, `${totalWords} words`);
+    const replay = el('button', { class: 'ab-link ab-decay-replay', text: '↻ Replay the decay' });
+    const body = el('div', { class: 'ab-decay-body' },
+      sentences.map((s, i) => el('span', { class: 'ab-decay-sent', 'data-i': i }, s + ' ')));
+    const wrap = el('div', { class: 'ab-decay' }, [
+      el('div', { class: 'ab-decay-head' }, [el('span', { text: 'Watch the filler die.' }), counter]),
+      body,
+      replay
+    ]);
+    return { wrap, body, counter, replay };
+  }
+
+  // The actual animation: resets to a clean state, then deletes sentences in batches
+  // until only the "kept" ones remain. Safe to call again (Replay) — clears its own
+  // previous timer first, since `dom` and `plan` are shared with any earlier run.
+  function runDecayAnimation(dom, sentences, plan, timing) {
+    const { body, counter } = dom;
+    const { toDelete, totalWords } = plan;
+    const { batchSize, stepDelay, dyingMs } = timing;
+    let remaining = totalWords;
+    let timer = null;
+
+    clearTimeout(timer);
+    counter.textContent = `${remaining} words`;
+    counter.classList.remove('ab-decay-done');
+    body.querySelectorAll('.ab-decay-sent').forEach(n => {
+      n.classList.remove('ab-decay-dead', 'ab-decay-kept');
+      n.style.transitionDuration = '';
+    });
+
+    let cursor = 0;
+    const killBatch = () => {
+      const batch = toDelete.slice(cursor, cursor + batchSize);
+      cursor += batchSize;
+      for (const i of batch) {
+        const node = body.querySelector(`.ab-decay-sent[data-i="${i}"]`);
+        if (!node) continue;
+        node.style.transitionDuration = `${dyingMs}ms`;
+        node.classList.add('ab-decay-dying');
+        remaining = Math.max(0, remaining - wc(sentences[i]));
+        setTimeout(() => node.classList.add('ab-decay-dead'), dyingMs);
+      }
+      counter.textContent = `${remaining} words`;
+    };
+    const finish = () => {
+      body.querySelectorAll('.ab-decay-sent').forEach(n => { if (!n.classList.contains('ab-decay-dead')) n.classList.add('ab-decay-kept'); });
+      counter.classList.add('ab-decay-done');
+      counter.textContent = `${totalWords} words → ${remaining} words`;
+    };
+    const tick = () => {
+      if (cursor >= toDelete.length) return finish();
+      killBatch();
+      timer = setTimeout(tick, stepDelay);
+    };
+    timer = setTimeout(tick, Math.max(300, stepDelay * 0.8));
+  }
 
   // -------------------------------------------------------------------------
   // THE GRAVEYARD — the draft answers rejected before the final one was kept.
@@ -140,7 +172,8 @@
         el('p', { class: 'ab-grave-text', text: AB.truncate(ctx.answer, 500) })
       ]));
       return el('div', {}, [
-        el('p', { class: 'ab-muted', text: 'This is not the only answer that could have come back. Here is what almost got sent instead.' }),
+        el('p', { class: 'ab-muted', text: 'This is not the only answer that could have come back. Here is what plausibly almost got sent instead.' }),
+        el('p', { class: 'ab-grave-disclosure', text: 'These drafts are imagined by AI for this exercise, not a real log of anything the model actually generated and discarded.' }),
         el('ul', { class: 'ab-grave' }, items)
       ]);
     }
@@ -223,4 +256,37 @@
 
   AB.MODES = [decay, graveyard, rebuild, guess];
   AB.MODE_BY_ID = Object.fromEntries(AB.MODES.map(m => [m.id, m]));
+
+  // ---------------------------------------------------------------------------
+  // One combined call instead of four. Every mode's individual buildPrompt above
+  // stays as-is (and stays covered by the test suite), but the running extension
+  // uses this instead: one request that asks for all four analyses in one JSON
+  // object, so clicking through all four modes on an answer costs one OpenRouter
+  // call, not four. That's four fewer chances to hit a free-tier rate limit on
+  // the same answer, and it's faster for the person clicking around too.
+  AB.buildCombinedPrompt = (answer, question, local) => {
+    const sentencesList = local.sentences.slice(0, 60).map((s, i) => `[${i}] ${s}`).join('\n');
+    return frame(question, answer) +
+      'Produce FOUR separate analyses of this answer below, all in ONE JSON object. Do all four; do not skip any.\n\n' +
+      'The answer, split into numbered sentences (used by "decay" and "audit" below):\n' + sentencesList + '\n\n' +
+      '1) "decay" — Rank every sentence index from LEAST essential (pure scaffolding: filler, repetition, hedging, ' +
+      'throat-clearing) to MOST essential (the actual claim, what would still answer the question with everything else stripped away). ' +
+      'Include every index exactly once.\n' +
+      '   Shape: { "order": [indices, least essential first, most essential last], "keep_count": how many trailing sentences form the real answer, usually 1 or 2 }\n\n' +
+      '2) "graveyard" — Invent 4 to 6 earlier draft answers that could have preceded the final one above. Genuinely varied: ' +
+      'at least one clearly worse, at least one arguably as good or better, and one that reads like it got cut off mid-sentence. ' +
+      'Each under 45 words, each with one short blunt reason it was rejected.\n' +
+      '   Shape: { "drafts": [ { "text": "...", "reason": "..." } ] }\n\n' +
+      '3) "rebuild" — Rewrite the answer 3 separate times. Same facts and conclusion every time, but change the sentence order, ' +
+      'phrasing, and what gets emphasised first. Make the 3 versions feel distinctly different to read. Each under 130 words.\n' +
+      '   Shape: { "versions": ["version 1", "version 2", "version 3"] }\n\n' +
+      '4) "audit" — Score every numbered sentence above. Be harsh and honest.\n' +
+      '   - KNOW: verifiable fact or definition, widely documented.\n' +
+      '   - INFER: reasoned from facts, but a step removed. Could be wrong.\n' +
+      '   - GUESS: assumption, opinion, or generalisation stated as if true.\n' +
+      '   confidence is 0 to 100: how likely the sentence is correct for THIS user.\n' +
+      '   Shape: { "sentences": [ { "i": 0, "confidence": 85, "label": "KNOW | INFER | GUESS", "why": "short reason" } ], "verdict": "one blunt sentence on how solid the answer really is" }\n\n' +
+      'Return one JSON object shaped exactly like this, with all four keys present:\n' +
+      '{ "decay": { ... }, "graveyard": { ... }, "rebuild": { ... }, "audit": { ... } }';
+  };
 })();
