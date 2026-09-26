@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Argue Back",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Take apart any AI answer. See what it knows, what it infers, and what it is guessing, without regenerating a word.",
   "permissions": [
     "storage",
@@ -18,6 +18,13 @@
     "https://chat.deepseek.com/*",
     "https://grok.com/*",
     "https://chat.mistral.ai/*",
+    "https://www.google.com/search*",
+    "https://www.google.co.in/search*",
+    "https://www.google.co.uk/search*",
+    "https://www.google.ca/search*",
+    "https://www.google.com.au/search*",
+    "https://www.google.de/search*",
+    "https://www.google.fr/search*",
     "https://openrouter.ai/*"
   ],
   "background": {
@@ -37,7 +44,14 @@
         "https://copilot.microsoft.com/*",
         "https://chat.deepseek.com/*",
         "https://grok.com/*",
-        "https://chat.mistral.ai/*"
+        "https://chat.mistral.ai/*",
+        "https://www.google.com/search*",
+        "https://www.google.co.in/search*",
+        "https://www.google.co.uk/search*",
+        "https://www.google.ca/search*",
+        "https://www.google.com.au/search*",
+        "https://www.google.de/search*",
+        "https://www.google.fr/search*"
       ],
       "js": [
         "utils.js",

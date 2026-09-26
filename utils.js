@@ -54,7 +54,32 @@ AB.SITES = {
   }
 };
 
-AB.site = AB.SITES[location.hostname.replace(/^www\./, '')] || null;
+// Google's markup is obfuscated and changes often, so instead of class names we anchor on the
+// visible "AI Overview" heading and climb to the block that holds the overview text.
+AB.GOOGLE = {
+  findAnswers: () => {
+    const heads = [...document.querySelectorAll('h1, h2, h3, div, span')]
+      .filter(e => e.childElementCount === 0 && /^AI overview$/i.test(e.textContent.trim()) && !e.closest('.ab-root'));
+    const out = [];
+    for (const h of heads) {
+      let box = h.parentElement;
+      while (box && box.parentElement && box.innerText.trim().length < 200 && !box.matches('#rso, #search, #center_col, body')) {
+        box = box.parentElement;
+      }
+      if (box && !box.matches('#rso, #search, #center_col, body') && !out.includes(box)) out.push(box);
+    }
+    return out;
+  },
+  getQuestion: () => {
+    const box = document.querySelector('textarea[name="q"], input[name="q"]');
+    return (box && box.value) || new URLSearchParams(location.search).get('q') || '';
+  },
+  input: 'textarea[name="q"]',
+  isStreaming: () => false
+};
+
+AB.site = AB.SITES[location.hostname.replace(/^www\./, '')]
+  || (/^www\.google\.[a-z.]+$/.test(location.hostname) && location.pathname === '/search' ? AB.GOOGLE : null);
 
 AB.el = (tag, attrs = {}, children = []) => {
   const node = document.createElement(tag);
@@ -75,6 +100,7 @@ AB.el = (tag, attrs = {}, children = []) => {
 // Outermost matching answer nodes only, so nested matches do not get two button bars.
 AB.findAnswers = () => {
   if (!AB.site) return [];
+  if (AB.site.findAnswers) return AB.site.findAnswers();
   const all = [...document.querySelectorAll(AB.site.answers)];
   return all.filter(n => !all.some(o => o !== n && o.contains(n)));
 };
@@ -93,6 +119,7 @@ AB.extractAnswerText = (answerEl) => {
 // The user message sitting right before this answer in document order.
 AB.extractQuestion = (answerEl) => {
   if (!AB.site) return '';
+  if (AB.site.getQuestion) return AB.site.getQuestion();
   let last = null;
   for (const q of document.querySelectorAll(AB.site.questions)) {
     if (q.compareDocumentPosition(answerEl) & Node.DOCUMENT_POSITION_FOLLOWING) last = q;
