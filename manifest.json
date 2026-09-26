@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Argue Back",
+  "version": "1.0.0",
+  "description": "Take apart any AI answer. See what it knows, what it infers, and what it is guessing, without regenerating a word.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://openrouter.ai/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Argue Back settings"
+  },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*", "https://claude.ai/*"],
+      "js": ["utils.js", "analyzer.js", "modes.js", "content_script.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
