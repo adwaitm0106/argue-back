@@ -32,6 +32,29 @@ Click it, and the same answer reappears, same facts, same conclusion, but phrase
 ### The Guess, Highlighted
 Every sentence gets color coded: green for something the model actually knows, yellow for something it's inferring, red for something it's quietly guessing and hoping sounds right. Hover any sentence for the reason. At the end there's a scorecard: *50% fact, 40% inference, 10% guess*, with an average confidence score.
 
+## Screenshots
+
+All of these are real captures of the extension running on live answers, not mockups.
+
+<p align="center">
+  <img src="assets/screenshots/decay.gif" alt="The Decay animating on a ChatGPT answer" width="640">
+  <br><sub>The Decay on ChatGPT: 128 words down to the 37 that carry the actual claim.</sub>
+</p>
+
+| The Decay | The Graveyard | The Rebuild |
+|---|---|---|
+| ![The Decay](assets/screenshots/decay.png) | ![The Graveyard](assets/screenshots/graveyard.png) | ![The Rebuild](assets/screenshots/rebuild.png) |
+
+<p align="center">
+  <img src="assets/screenshots/google-scorecard.png" alt="The Guess, Highlighted scorecard on a Google AI Overview" width="820">
+  <br><sub>The Guess, Highlighted on a Google AI Overview: 57% fact, 11% inference, 32% guess.</sub>
+</p>
+
+<p align="center">
+  <img src="assets/screenshots/website.png" alt="The Argue Back website" width="820">
+  <br><sub>The project site at <a href="https://argue-back.vercel.app">argue-back.vercel.app</a>.</sub>
+</p>
+
 ## Works where you already are
 
 **Inside AI chats.** The button shows up under every answer on ChatGPT, Claude, Gemini, Perplexity, Microsoft Copilot, DeepSeek, Grok and Mistral Le Chat.
