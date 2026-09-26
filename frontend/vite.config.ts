@@ -12,4 +12,7 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Top-level, not nested under tanstackStart.server: that's the option the
+  // config wrapper actually forwards to nitro's own preset selection.
+  nitro: { preset: "vercel" },
 });
