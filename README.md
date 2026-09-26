@@ -45,6 +45,11 @@ All of these are real captures of the extension running on live answers, not moc
 |---|---|---|
 | ![The Decay](assets/screenshots/decay.png) | ![The Graveyard](assets/screenshots/graveyard.png) | ![The Rebuild](assets/screenshots/rebuild.png) |
 
+| ChatGPT scorecard | Claude scorecard |
+|---|---|
+| ![Scorecard on a ChatGPT answer](assets/screenshots/chatgpt-scorecard.png) | ![Scorecard on a Claude answer](assets/screenshots/claude-scorecard.png) |
+| 81% fact, 19% inference, 0% guess | 63% fact, 26% inference, 11% guess |
+
 <p align="center">
   <img src="assets/screenshots/google-scorecard.png" alt="The Guess, Highlighted scorecard on a Google AI Overview" width="820">
   <br><sub>The Guess, Highlighted on a Google AI Overview: 57% fact, 11% inference, 32% guess.</sub>
