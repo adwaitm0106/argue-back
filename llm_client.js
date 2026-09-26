@@ -28,13 +28,18 @@ const PROVIDERS = {
     label: 'Groq',
     keyUrl: 'https://console.groq.com/keys',
     keyHint: 'gsk_...',
-    // Groq's free tier is per-model, not one shared daily pool — llama-3.1-8b-instant
-    // alone is good for 14,400 requests/day. Numbers per Groq's own docs, current as
-    // of writing; they revise the roster and limits periodically.
+    // Groq's free tier is per-model, not one shared daily pool. Groq revises its
+    // model roster fairly often — llama-3.1-8b-instant and llama-3.3-70b-versatile,
+    // used here previously, were retired and replaced with the gpt-oss/qwen lineup
+    // below sometime after this was first written. Confirmed live against Groq's
+    // /models endpoint: 1,000 requests/day and 8,000 tokens/minute per model on the
+    // free tier as of writing (still dramatically more than OpenRouter's shared
+    // ~50/day). If a model in this list ever 404s as "does not exist", that's Groq
+    // having moved the roster again — check https://console.groq.com/docs/models.
     models: [
-      'llama-3.1-8b-instant', // 14,400 requests/day, 500K tokens/day
-      'llama-3.3-70b-versatile', // 1,000 requests/day, 100K tokens/day — slower daily cap, stronger model
-      'gemma2-9b-it'
+      'openai/gpt-oss-120b',
+      'openai/gpt-oss-20b',
+      'qwen/qwen3.8-27b'
     ],
     call: callGroq,
     testKey: testGroqKey

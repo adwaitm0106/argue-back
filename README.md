@@ -98,7 +98,7 @@ Pick a provider in settings — both are genuinely free, no card required:
 
 | Provider | Free tier | Get a key |
 |---|---|---|
-| **Groq** (default) | Up to 14,400 requests/day on its fastest model | [console.groq.com/keys](https://console.groq.com/keys) |
+| **Groq** (default) | 1,000 requests/day per model, several models to race | [console.groq.com/keys](https://console.groq.com/keys) |
 | **Google Gemini** | 1,500 requests/day | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
 
 Each provider races its own list of free models (see "requests race" above) rather than trying them one at a time, and each keeps its own key and model choice in settings, so switching providers never overwrites the other one's setup. Click **Test key** any time to confirm a key works before relying on it.

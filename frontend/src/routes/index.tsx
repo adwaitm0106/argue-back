@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ModeSelect } from "@/components/ui/mode-select";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 import { AboutChapter, HowChapter } from "@/components/site-chapters";
 import { SilkBackdrop } from "@/components/silk-backdrop";
 import MorphGallery from "@/components/ui/morph-gallery";
+import { MODES } from "@/lib/modes";
 import reel1 from "@/assets/argue-reel-1.jpg";
 import reel2 from "@/assets/argue-reel-2.jpg";
 import reel3 from "@/assets/argue-reel-3.jpg";
@@ -32,12 +34,6 @@ const SENTENCES = [
   "Ultimately, the best choice depends on what feels right for you and your situation.",
 ];
 const CORE = [2, 4];
-const MODES = [
-  { name: "The Decay", blurb: "Strip away the padding until only the answer remains." },
-  { name: "The Graveyard", blurb: "See the other answers that might have been given." },
-  { name: "The Rebuild", blurb: "The same point, put differently." },
-  { name: "The Guess, Highlighted", blurb: "Spot where an answer becomes an assumption." },
-];
 const countWords = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
 const FULL_WORDS = countWords(SENTENCES.join(" "));
 const REEL = [
@@ -47,33 +43,18 @@ const REEL = [
 ];
 
 function Index() {
-  const [open, setOpen] = useState(false);
   const [removed, setRemoved] = useState<number[]>([]);
   const [fading, setFading] = useState<number | null>(null);
   const [running, setRunning] = useState(false);
   const [mode, setMode] = useState<string | null>(null);
   const [rebuildVersion, setRebuildVersion] = useState(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const onDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onEscape = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onEscape);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onEscape);
-      timers.current.forEach(clearTimeout);
-    };
-  }, []);
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
   const runDecay = () => {
     if (running) return;
     timers.current.forEach(clearTimeout);
-    setOpen(false);
     setRemoved([]);
     setFading(null);
     setRunning(true);
@@ -102,7 +83,6 @@ function Index() {
     setFading(null);
     setRemoved([]);
     setMode(name);
-    setOpen(false);
     if (name === "The Rebuild") setRebuildVersion((value) => value + 1);
   };
   const words = countWords(SENTENCES.filter((_, i) => !removed.includes(i)).join(" "));
@@ -111,9 +91,13 @@ function Index() {
     <div className="min-h-screen bg-background text-foreground">
       <main>
         <section className="relative isolate bg-night text-paper [--foreground:var(--paper)]">
-          {/* Decorative background only — clipped to the section on its own, so the
-              "Argue back" dropdown below (which intentionally overflows past the
-              section once open) doesn't get cut off by a section-wide overflow-hidden. */}
+          {/* Decorative background only — clipped to the section on its own, rather
+              than via overflow-hidden on the whole section, which used to also clip
+              the "Argue back" dropdown below whenever it grew past the section's
+              height. (ModeSelect now renders its popover through a portal anyway, so
+              it's no longer section-bound at all — kept scoped here regardless, since
+              a section-wide overflow-hidden is exactly the kind of thing that quietly
+              breaks the next thing someone adds inside it.) */}
           <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
             <SilkBackdrop />
             <div className="absolute inset-0 opacity-65">
@@ -137,16 +121,13 @@ function Index() {
                    {mode === "The Graveyard" ? <div className="space-y-4"><p className="text-lime">Other answers considered</p><p className="border-l border-light-line pl-4 text-paper/65">“Always take one, just in case.”</p><p className="border-l border-light-line pl-4 text-paper/65">“No, you probably won't need it.”</p><p className="border-l border-lime pl-4">A better answer depends on the forecast, not a blanket rule.</p></div> : mode === "The Rebuild" ? <p>{rebuildVersion % 2 ? "Check the forecast before you go: rain means bring an umbrella; clear skies mean you can leave it behind." : "An umbrella is useful if rain is expected. Otherwise, you can skip it."}</p> : mode === "The Guess, Highlighted" ? <p>Without a location or forecast, <mark className="bg-lime text-night">assuming it will rain is a guess</mark>. Check today's forecast first; bring an umbrella if rain is likely.</p> : <div className="space-y-1">{SENTENCES.map((sentence, i) => !removed.includes(i) && <div key={i} className={`decay-sentence ${fading === i ? "decay-sentence-exit" : ""}`}><span>{sentence}</span></div>)}</div>}
                  </div>
                 <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-light-line pt-5">
-                  <div className="relative" ref={menuRef}>
-                    <Button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="menu" className="h-10 rounded-none bg-lime px-5 text-night shadow-none hover:bg-lime/85">
-                      Argue back <ChevronDown aria-hidden="true" />
-                    </Button>
-                    {open && <div role="menu" aria-label="Ways to argue back" className="absolute left-0 top-full z-30 mt-1 max-h-80 w-[min(19rem,calc(100vw-3rem))] overflow-y-auto border border-light-line bg-night text-paper shadow-lg">
-                       {MODES.map((item) => <Button key={item.name} type="button" role="menuitem" variant="ghost" onClick={() => selectMode(item.name)} className="h-auto w-full justify-start rounded-none border-b border-light-line px-4 py-3 text-left whitespace-normal last:border-b-0 hover:bg-forest hover:text-paper">
-                         <span className="block w-full"><span className="font-display text-lg">{item.name}</span><span className="mt-1 block font-sans text-xs font-normal leading-snug text-paper/70">{item.blurb}</span></span>
-                      </Button>)}
-                    </div>}
-                  </div>
+                  <ModeSelect
+                    aria-label="Ways to argue back"
+                    placeholder="Argue back"
+                    value={mode}
+                    onSelect={selectMode}
+                    options={MODES.map((item) => ({ value: item.name, title: item.name, description: item.blurb }))}
+                  />
                    {(!mode || mode === "The Decay") && <p className="font-sans text-sm tabular-nums text-paper/75" aria-live="polite">{FULL_WORDS} words {words !== FULL_WORDS && <span className="text-lime">→ {words} words</span>}</p>}
                   {removed.length > 0 && !running && <Button type="button" variant="ghost" onClick={reset} className="h-9 rounded-none px-2 text-paper underline underline-offset-4 hover:bg-forest hover:text-paper"><RotateCcw aria-hidden="true" /> Restore the filler</Button>}
                 </div>
