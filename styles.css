@@ -120,13 +120,6 @@
 .ab-tree-node[open] { background: var(--ab-soft); }
 .ab-tree-text { font-weight: 500; }
 
-/* Columns */
-.ab-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin-top: 8px; }
-.ab-col { border: 1px solid var(--ab-line); border-radius: 8px; padding: 10px; }
-.ab-col-bold { border-color: var(--ab-red); }
-.ab-col-honest { border-color: var(--ab-green); }
-.ab-col-counter { border-color: var(--ab-red); background: var(--ab-red-bg); }
-.ab-original { color: var(--ab-muted); font-size: 13px; white-space: pre-wrap; }
 
 /* Mode 3: inline audit */
 .ab-audit { line-height: 2; }
@@ -143,20 +136,7 @@
 .ab-tip:empty { display: none !important; }
 .ab-sent:hover .ab-tip, .ab-sent:focus .ab-tip { display: block; }
 
-/* Mode 4: stacked cards */
-.ab-stack { display: grid; gap: 10px; }
-.ab-card { border: 1px solid var(--ab-line); border-radius: 10px; padding: 10px 12px; animation: ab-in .3s ease-out both; animation-delay: calc(var(--i, 0) * 90ms); }
-.ab-card-head { display: flex; gap: 6px; align-items: baseline; font-weight: 600; }
 
-/* Mode 6: gap table */
-.ab-gap { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--ab-line); border-radius: 8px; overflow: hidden; }
-.ab-gap-head { background: var(--ab-soft); font-weight: 700; padding: 8px 10px; font-size: 12px; text-transform: uppercase; }
-.ab-gap-cell { padding: 8px 10px; border-top: 1px solid var(--ab-line); }
-.ab-gap-real { background: var(--ab-yellow-bg); }
-
-@media (max-width: 560px) {
-  .ab-gap { grid-template-columns: 1fr; }
-}
 
 /* Inline annotations on the original answer (CSS Custom Highlight API) */
 ::highlight(ab-know) { background-color: rgba(31, 157, 85, .16); }
@@ -179,3 +159,28 @@
 .ab-float-answer { max-height: 220px; overflow: auto; padding: 8px 10px; background: #f6f6f8; border-radius: 8px; }
 .ab-float-answer p { margin: 0 0 8px; }
 .ab-float .ab-root { margin-bottom: 0; }
+
+/* The Decay */
+.ab-decay-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; font-weight: 600; }
+.ab-decay-counter { font-variant-numeric: tabular-nums; color: var(--ab-accent); font-weight: 700; }
+.ab-decay-counter.ab-decay-done { color: var(--ab-red); }
+.ab-decay-body { line-height: 1.9; }
+.ab-decay-sent { display: inline; transition: opacity .4s ease, filter .4s ease, max-height .4s ease; }
+.ab-decay-sent.ab-decay-dying { opacity: .15; filter: blur(3px); }
+.ab-decay-sent.ab-decay-dead { display: none; }
+.ab-decay-sent.ab-decay-kept { background: var(--ab-yellow-bg); border-radius: 4px; padding: 1px 3px; font-weight: 600; }
+.ab-decay-replay { margin-top: 12px; }
+
+/* The Graveyard */
+.ab-grave { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 10px; }
+.ab-grave-item { border: 1px solid var(--ab-line); border-radius: 10px; padding: 10px 12px; opacity: .6; }
+.ab-grave-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.ab-grave-text { text-decoration: line-through; color: var(--ab-muted); }
+.ab-grave-reason { font-size: 12.5px; color: var(--ab-muted); font-style: italic; margin: 4px 0 0; }
+.ab-grave-kept { opacity: 1; border-color: var(--ab-green); background: var(--ab-green-bg); }
+.ab-grave-kept .ab-grave-text { text-decoration: none; color: var(--ab-fg); font-weight: 500; }
+
+/* The Rebuild */
+.ab-rebuild-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.ab-rebuild-text { padding: 10px 12px; background: var(--ab-soft); border-radius: 10px; }
+.ab-rebuild-text.ab-rebuild-in, .ab-rebuild-text { animation: ab-in .3s ease-out; }

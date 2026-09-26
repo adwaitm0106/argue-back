@@ -23,7 +23,7 @@ async function callModel(apiKey, model, prompt) {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': 'https://github.com/adwaitm0106/argue-back',
-      'X-Title': "Argue Back (BitNBuild '26)"
+      'X-Title': 'Argue Back'
     },
     body: JSON.stringify({
       model,

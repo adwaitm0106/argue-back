@@ -1,4 +1,4 @@
-// The six ways to argue back. Each mode owns its prompt and its renderer.
+// The four ways to argue back. Each mode owns its prompt and its renderer.
 // Every prompt asks for strict JSON so rendering never depends on model formatting luck.
 
 (() => {
@@ -7,94 +7,174 @@
 
   const MAX_ANSWER_CHARS = 9000;
 
+  // Cheap keyword gate. When a question or answer touches health, money, or legal
+  // ground, being wrong costs more than usual, so we tell the auditor to grade harder.
+  const HIGH_STAKES_RE = /\b(dos(?:e|age)|symptom|diagnos\w*|treatment|medication|drug interaction|side effect|surgery|pregnan\w*|mental health|suicide|invest\w*|stocks?|crypto\w*|retirement|mortgage|loan|tax(?:es)?|insurance|lawsuit|legal advice|contract|visa|immigration|will\b|custody)\b/i;
+  const isHighStakes = (question, answer) => HIGH_STAKES_RE.test(question) || HIGH_STAKES_RE.test(answer.slice(0, 2000));
+  const STAKES_CLAUSE =
+    'This question touches health, money, or legal ground, where a wrong answer costs more than usual. ' +
+    'Grade harder than you normally would: treat "usually" and "in most cases" as GUESS unless the answer names a source, ' +
+    'and call out anywhere a reader might act on this without checking with a professional first.\n\n';
+
   const frame = (question, answer) =>
     `QUESTION the user asked:\n"""${AB.truncate(question, 1500) || '(not available)'}"""\n\n` +
     `ANSWER the assistant gave:\n"""${AB.truncate(answer, MAX_ANSWER_CHARS)}"""\n\n` +
-    'Do not rewrite, improve or re-answer this. Analyse it.\n\n';
+    'Do not rewrite, improve or re-answer this. Analyse it.\n\n' +
+    (isHighStakes(question, answer) ? STAKES_CLAUSE : '');
 
   const pill = (text, tone) => el('span', { class: `ab-pill ab-${tone}`, text });
-
-  const toneForStatus = { valid: 'green', questionable: 'yellow', unstated: 'red' };
-  const toneForWeight = { CRITICAL: 'red', IMPORTANT: 'yellow', 'NICE-TO-HAVE': 'grey' };
-  const toneForLabel = { KNOW: 'green', INFER: 'yellow', GUESS: 'red' };
   const toneForScore = (s) => (s >= 80 ? 'green' : s >= 40 ? 'yellow' : 'red');
-
   const list = (items, fn) => (Array.isArray(items) ? items : []).map(fn);
+  const wc = (s) => (s.match(/\b[\w'-]+\b/g) || []).length;
 
   // -------------------------------------------------------------------------
-  const graveyard = {
-    id: 'graveyard',
-    label: 'Show Assumptions',
-    blurb: 'What has to be true for this answer to hold up?',
-    buildPrompt: (answer, question, local) =>
-      frame(question, answer) +
-      'Locally detected claims (for reference):\n' +
-      local.claims.slice(0, 15).map((c, i) => `${i + 1}. ${c.text}`).join('\n') +
-      '\n\nFind the 5 most important assumptions this answer silently depends on. ' +
-      'Go deeper than restating the claims: what must be true about the user, their situation, the world, or the data ' +
-      'for this answer to be correct?\n\n' +
-      'Return JSON:\n{\n  "root": "the answer\'s core claim in one sentence",\n  "assumptions": [\n    {\n' +
-      '      "text": "the assumption, stated plainly",\n' +
-      '      "weight": "CRITICAL | IMPORTANT | NICE-TO-HAVE",\n' +
-      '      "status": "valid | questionable | unstated",\n' +
-      '      "why": "one sentence on why it matters",\n' +
-      '      "breaks_if": "a concrete situation where this assumption fails"\n    }\n  ]\n}',
-    render: (data) => {
-      const tree = el('div', { class: 'ab-tree' });
-      tree.append(el('div', { class: 'ab-tree-root' }, [el('span', { class: 'ab-tree-label', text: 'The answer says' }), data.root || '']));
-      const branches = el('ul', { class: 'ab-tree-branches' });
-      list(data.assumptions, (a) => {
-        const status = String(a.status || '').toLowerCase();
-        const weight = String(a.weight || '').toUpperCase();
-        const details = el('details', { class: 'ab-tree-node' }, [
-          el('summary', {}, [
-            pill(weight || 'ASSUMPTION', toneForWeight[weight] || 'grey'),
-            pill(status || 'unknown', toneForStatus[status] || 'grey'),
-            el('span', { class: 'ab-tree-text', text: a.text })
-          ]),
-          a.why && el('p', {}, [el('b', { text: 'Why it matters: ' }), a.why]),
-          a.breaks_if && el('p', {}, [el('b', { text: 'Breaks if: ' }), a.breaks_if])
-        ]);
-        branches.append(el('li', {}, details));
-      });
-      tree.append(branches);
-      return tree;
-    }
-  };
-
+  // THE DECAY — the answer deletes itself, sentence by sentence, until only
+  // the claim remains. Flagship mode. Runs its own animation loop.
   // -------------------------------------------------------------------------
   const decay = {
     id: 'decay',
-    label: 'Strip Filler',
-    blurb: 'Separate the load bearing claims from the scaffolding.',
+    label: 'The Decay',
+    blurb: 'The answer deletes itself, sentence by sentence, until only the claim remains.',
     buildPrompt: (answer, question, local) =>
       frame(question, answer) +
-      `Hedge words found locally: ${[...new Set(local.hedges.map(h => h.word.toLowerCase()))].join(', ') || 'none'}.\n\n` +
-      'Restate the answer\'s substance two ways, each under 120 words:\n' +
-      '1. "bold": as if the author were 100% certain. Remove every hedge. Make every claim flat and absolute.\n' +
-      '2. "honest": openly admitting exactly which parts are uncertain, and why.\n' +
-      'Then list which claims are load bearing (the answer collapses without them) and which are filler.\n\n' +
-      'Return JSON:\n{\n  "bold": "...",\n  "honest": "...",\n  "load_bearing": ["short claim", "..."],\n  "filler": ["short phrase", "..."],\n' +
-      '  "takeaway": "one sentence on how much the hedging changes the meaning"\n}',
+      'Here is the answer split into numbered sentences:\n' +
+      local.sentences.slice(0, 40).map((s, i) => `[${i}] ${s}`).join('\n') +
+      '\n\nRank every index from LEAST essential to MOST essential. Least essential means pure scaffolding: ' +
+      'filler, repetition, hedging, throat-clearing, pleasantries. Most essential means the actual claim being made, ' +
+      'the sentence(s) that would still answer the question with everything else stripped away.\n\n' +
+      'Return JSON:\n{\n  "order": [array of every index, least essential first, most essential last],\n' +
+      '  "keep_count": how many of the trailing (most essential) sentences form the real answer, usually 1 or 2\n}',
     render: (data, ctx) => {
-      const cols = el('div', { class: 'ab-cols ab-cols-3' }, [
-        el('div', { class: 'ab-col ab-col-bold' }, [el('h4', { text: '100% certain' }), el('p', { text: data.bold || '' })]),
-        el('div', { class: 'ab-col ab-col-honest' }, [el('h4', { text: 'Admits uncertainty' }), el('p', { text: data.honest || '' })]),
-        el('div', { class: 'ab-col' }, [el('h4', { text: 'What it actually said' }), el('p', { class: 'ab-original', text: AB.truncate(ctx.answer, 700) })])
+      const sentences = ctx.local.sentences;
+      const order = Array.isArray(data.order) ? data.order.filter(i => Number.isInteger(i) && sentences[i]) : [];
+      // Fill in anything the model dropped so every sentence still gets accounted for.
+      for (let i = 0; i < sentences.length; i++) if (!order.includes(i)) order.unshift(i);
+      const keepCount = Math.min(Math.max(1, Number(data.keep_count) || 1), sentences.length);
+      const toDelete = order.slice(0, Math.max(0, order.length - keepCount));
+
+      const totalWords = ctx.local.words || sentences.reduce((n, s) => n + wc(s), 0);
+      const counter = el('div', { class: 'ab-decay-counter' }, `${totalWords} words`);
+      const replay = el('button', { class: 'ab-link ab-decay-replay', text: '↻ Replay the decay' });
+      const body = el('div', { class: 'ab-decay-body' },
+        sentences.map((s, i) => el('span', { class: 'ab-decay-sent', 'data-i': i }, s + ' ')));
+      const wrap = el('div', { class: 'ab-decay' }, [
+        el('div', { class: 'ab-decay-head' }, [el('span', { text: 'Watch the filler die.' }), counter]),
+        body,
+        replay
       ]);
-      const lists = el('div', { class: 'ab-cols' }, [
-        el('div', { class: 'ab-col' }, [el('h4', { text: 'Load bearing' }), el('ul', {}, list(data.load_bearing, s => el('li', { text: s })))]),
-        el('div', { class: 'ab-col' }, [el('h4', { text: 'Filler' }), el('ul', {}, list(data.filler, s => el('li', { text: s })))])
-      ]);
-      return el('div', {}, [cols, lists, data.takeaway && el('p', { class: 'ab-takeaway', text: data.takeaway })]);
+
+      let remaining = totalWords;
+      let timer = null;
+      const play = () => {
+        clearTimeout(timer);
+        remaining = totalWords;
+        counter.textContent = `${remaining} words`;
+        counter.classList.remove('ab-decay-done');
+        body.querySelectorAll('.ab-decay-sent').forEach(n => n.classList.remove('ab-decay-dead', 'ab-decay-kept'));
+        let step = 0;
+        const tick = () => {
+          if (step >= toDelete.length) {
+            body.querySelectorAll('.ab-decay-sent').forEach(n => { if (!n.classList.contains('ab-decay-dead')) n.classList.add('ab-decay-kept'); });
+            counter.classList.add('ab-decay-done');
+            counter.textContent = `${totalWords} words → ${remaining} words`;
+            return;
+          }
+          const i = toDelete[step++];
+          const node = body.querySelector(`.ab-decay-sent[data-i="${i}"]`);
+          if (node) {
+            node.classList.add('ab-decay-dying');
+            remaining = Math.max(0, remaining - wc(sentences[i]));
+            counter.textContent = `${remaining} words`;
+            setTimeout(() => node.classList.add('ab-decay-dead'), 420);
+          }
+          timer = setTimeout(tick, 550);
+        };
+        timer = setTimeout(tick, 500);
+      };
+      replay.addEventListener('click', play);
+      // Auto-start the moment this mode is shown. requestAnimationFrame lets the DOM insert first.
+      requestAnimationFrame(() => requestAnimationFrame(play));
+      return wrap;
     }
   };
 
   // -------------------------------------------------------------------------
-  const audit = {
-    id: 'audit',
-    label: 'Rate Yourself',
-    blurb: 'Every sentence gets a confidence score and a label.',
+  // THE GRAVEYARD — the draft answers rejected before the final one was kept.
+  // -------------------------------------------------------------------------
+  const graveyard = {
+    id: 'graveyard',
+    label: 'The Graveyard',
+    blurb: 'The draft answers rejected before the final one was kept.',
+    buildPrompt: (answer, question) =>
+      frame(question, answer) +
+      'Invent 4 to 6 earlier drafts a model might have produced before settling on the final answer above. ' +
+      'Make them genuinely varied: at least one clearly worse than the final answer, at least one arguably just as good ' +
+      'or better, and one that reads like it got cut off mid-sentence. Each draft under 45 words. ' +
+      'For each, give one short, blunt reason it did not make the cut.\n\n' +
+      'Return JSON:\n{\n  "drafts": [ { "text": "the draft answer", "reason": "why it was rejected" } ]\n}',
+    render: (data, ctx) => {
+      const drafts = list(data.drafts, d => d).slice(0, 6);
+      const items = drafts.map((d, i) => el('li', { class: 'ab-grave-item' }, [
+        el('div', { class: 'ab-grave-head' }, [pill(`Draft ${i + 1}`, 'grey'), el('span', { class: 'ab-muted', text: 'rejected' })]),
+        el('p', { class: 'ab-grave-text', text: d.text || '' }),
+        d.reason && el('p', { class: 'ab-grave-reason', text: `Rejected because: ${d.reason}` })
+      ]));
+      items.push(el('li', { class: 'ab-grave-item ab-grave-kept' }, [
+        el('div', { class: 'ab-grave-head' }, [pill(`Draft ${drafts.length + 1}`, 'green'), el('span', { class: 'ab-muted', text: 'kept, this is what you were shown' })]),
+        el('p', { class: 'ab-grave-text', text: AB.truncate(ctx.answer, 500) })
+      ]));
+      return el('div', {}, [
+        el('p', { class: 'ab-muted', text: 'This is not the only answer that could have come back. Here is what almost got sent instead.' }),
+        el('ul', { class: 'ab-grave' }, items)
+      ]);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // THE REBUILD — same meaning, different shape, every time you click.
+  // -------------------------------------------------------------------------
+  const rebuild = {
+    id: 'rebuild',
+    label: 'The Rebuild',
+    blurb: 'Same meaning, different shape. Another phrasing with every click.',
+    buildPrompt: (answer, question) =>
+      frame(question, answer) +
+      'Rewrite the answer 3 separate times. Every rewrite must keep exactly the same facts and conclusion, ' +
+      'but change the sentence order, the phrasing, and what gets emphasised first. Make the 3 versions feel ' +
+      'distinctly different to read, not just synonym-swapped. Each under 130 words.\n\n' +
+      'Return JSON:\n{\n  "versions": ["version 1", "version 2", "version 3"]\n}',
+    render: (data, ctx) => {
+      const versions = list(data.versions, v => v).filter(Boolean);
+      if (!versions.length) versions.push(ctx.answer);
+      let idx = 0;
+      const counter = el('span', { class: 'ab-muted' }, `Version 1 of ${versions.length}`);
+      const text = el('p', { class: 'ab-rebuild-text' }, versions[0]);
+      const next = el('button', { class: 'ab-link', text: '↻ Rebuild again' });
+      next.addEventListener('click', () => {
+        idx = (idx + 1) % versions.length;
+        text.classList.remove('ab-rebuild-in');
+        void text.offsetWidth; // restart the animation
+        text.textContent = versions[idx];
+        text.classList.add('ab-rebuild-in');
+        counter.textContent = `Version ${idx + 1} of ${versions.length}`;
+      });
+      return el('div', { class: 'ab-rebuild' }, [
+        el('div', { class: 'ab-rebuild-head' }, [pill('Same meaning', 'grey'), counter]),
+        text,
+        next,
+        el('p', { class: 'ab-takeaway', text: 'Nothing here is "the" way to say this. It is one shuffle of the same facts.' })
+      ]);
+    }
+  };
+
+  // -------------------------------------------------------------------------
+  // THE GUESS, HIGHLIGHTED — separate what the model knows from what it is
+  // quietly guessing. Every sentence scored and color-coded, plus the scorecard.
+  // -------------------------------------------------------------------------
+  const guess = {
+    id: 'audit', // kept stable so the rest of the app can key off it without churn
+    label: 'The Guess, Highlighted',
+    blurb: 'Separate what the model knows from what it is quietly guessing.',
     buildPrompt: (answer, question, local) =>
       frame(question, answer) +
       'Here is the answer split into numbered sentences:\n' +
@@ -102,9 +182,9 @@
       '\n\nScore every numbered sentence. Be harsh and honest.\n' +
       '- KNOW: verifiable fact or definition, widely documented.\n' +
       '- INFER: reasoned from facts, but a step removed. Could be wrong.\n' +
-      '- GUESS: assumption, opinion, or generalisation stated as if true.\n' +
+      '- GUESS: assumption, opinion, or generalisation stated as if true, i.e. quietly pattern-matching.\n' +
       'confidence is 0 to 100: how likely the sentence is correct for THIS user.\n\n' +
-      'Return JSON:\n{\n  "sentences": [ { "i": 0, "confidence": 85, "label": "KNOW | INFER | GUESS", "why": "short reason" } ],\n' +
+      'Return JSON:\n{\n  "sentences": [ { "i": 0, "confidence": 85, "label": "KNOW | INFER | GUESS", "why": "short reason it is guessing, or why it is solid" } ],\n' +
       '  "verdict": "one blunt sentence on how solid the answer really is"\n}',
     render: (data, ctx) => {
       const byIndex = new Map(list(data.sentences, s => [Number(s.i), s]));
@@ -125,80 +205,6 @@
     }
   };
 
-  // -------------------------------------------------------------------------
-  const mutation = {
-    id: 'mutation',
-    label: 'Rephrase Assumptions',
-    blurb: 'Flip one assumption at a time and watch the answer move.',
-    buildPrompt: (answer, question) =>
-      frame(question, answer) +
-      'Pick the two assumptions whose failure would change this answer the most. ' +
-      'For each, write what the answer would say if that assumption were false (under 110 words each). ' +
-      'Keep everything else the same so the reader sees exactly what moved.\n\n' +
-      'Return JSON:\n{\n  "versions": [\n    { "assumption": "the assumption that is now false", "answer": "the answer under that world", "what_changed": "one line" }\n  ]\n}',
-    render: (data, ctx) => {
-      const cards = list(data.versions, (v, i) =>
-        el('div', { class: 'ab-card', style: `--i:${i}` }, [
-          el('div', { class: 'ab-card-head' }, [pill(`Version ${'AB'[i] || i + 1}`, 'yellow'), el('span', { text: `What if this is false: ${v.assumption || ''}` })]),
-          el('p', { text: v.answer || '' }),
-          v.what_changed && el('p', { class: 'ab-muted', text: `What changed: ${v.what_changed}` })
-        ]));
-      cards.push(el('div', { class: 'ab-card', style: `--i:${cards.length}` }, [
-        el('div', { class: 'ab-card-head' }, [pill('Original', 'green'), el('span', { text: 'What it actually said' })]),
-        el('p', { class: 'ab-original', text: AB.truncate(ctx.answer, 600) })
-      ]));
-      return el('div', { class: 'ab-stack' }, cards);
-    }
-  };
-
-  // -------------------------------------------------------------------------
-  const counter = {
-    id: 'counter',
-    label: 'Opposite Premise',
-    blurb: 'The strongest case that this answer is completely wrong.',
-    buildPrompt: (answer, question) =>
-      frame(question, answer) +
-      'Find the ONE assumption which, if false, flips this answer to its strongest valid opposite. ' +
-      'Then write that opposite answer as convincingly as the original (under 150 words). ' +
-      'It must be genuinely defensible, not a strawman.\n\n' +
-      'Return JSON:\n{\n  "assumption": "the single assumption being flipped",\n  "original_core": "the original answer in one sentence",\n' +
-      '  "opposite_answer": "...",\n  "why_plausible": "why a reasonable expert might hold this view",\n' +
-      '  "how_to_check": "the quickest way the user can tell which side is right for them"\n}',
-    render: (data) => el('div', {}, [
-      el('div', { class: 'ab-cols ab-split' }, [
-        el('div', { class: 'ab-col' }, [el('h4', { text: 'Original' }), el('p', { text: data.original_core || '' })]),
-        el('div', { class: 'ab-col ab-col-counter' }, [
-          el('h4', { text: `If "${data.assumption || 'the key assumption'}" is wrong, then` }),
-          el('p', { text: data.opposite_answer || '' })
-        ])
-      ]),
-      data.why_plausible && el('p', {}, [el('b', { text: 'Why it holds up: ' }), data.why_plausible]),
-      data.how_to_check && el('p', { class: 'ab-takeaway' }, [el('b', { text: 'How to check: ' }), data.how_to_check])
-    ])
-  };
-
-  // -------------------------------------------------------------------------
-  const gap = {
-    id: 'gap',
-    label: 'Textbook vs. Actual',
-    blurb: 'Where the principle ends and real life begins.',
-    buildPrompt: (answer, question) =>
-      frame(question, answer) +
-      'This answer leans on textbook knowledge, consensus or general principles. ' +
-      'For each of the 3 to 5 principles it relies on, show where it breaks in practice: exceptions, edge cases, ' +
-      'real world constraints, or workarounds practitioners actually use.\n\n' +
-      'Return JSON:\n{\n  "rows": [ { "principle": "what the answer treats as universal", "reality": "where and how it breaks in practice" } ],\n' +
-      '  "gap_summary": "one sentence on how big the gap is for this question"\n}',
-    render: (data) => el('div', {}, [
-      el('div', { class: 'ab-gap' }, [
-        el('div', { class: 'ab-gap-head', text: 'Textbook' }),
-        el('div', { class: 'ab-gap-head', text: 'In practice' }),
-        ...list(data.rows, r => [el('div', { class: 'ab-gap-cell', text: r.principle || '' }), el('div', { class: 'ab-gap-cell ab-gap-real', text: r.reality || '' })]).flat()
-      ]),
-      data.gap_summary && el('p', { class: 'ab-takeaway', text: data.gap_summary })
-    ])
-  };
-
-  AB.MODES = [graveyard, decay, audit, mutation, counter, gap];
+  AB.MODES = [decay, graveyard, rebuild, guess];
   AB.MODE_BY_ID = Object.fromEntries(AB.MODES.map(m => [m.id, m]));
 })();

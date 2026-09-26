@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Argue Back",
-  "version": "1.2.0",
-  "description": "Take apart any AI answer. See what it knows, what it infers, and what it is guessing, without regenerating a word.",
+  "version": "2.0.0",
+  "description": "Take apart any AI answer four ways: watch it delete its own filler, see its rejected drafts, watch it get rephrased, or see what it knows versus what it's guessing.",
   "permissions": [
     "storage",
     "contextMenus",

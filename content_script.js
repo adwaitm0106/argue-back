@@ -159,20 +159,20 @@
     );
 
     if (modeId === 'audit') {
+      annotateHedges(answerEl);
       annotateSentences(answerEl, res.result, state.ctx.local);
       const card = computeScorecard(res.result, state.ctx.local);
       root.querySelector('.ab-score-slot').replaceChildren(renderScorecard(card, state.ctx.local));
     }
   }
 
-  // The headline action: annotate the answer in place, then audit every sentence.
+  // The headline action: open the panel and let the user pick one of the four modes.
   function argueBack(answerEl, entry) {
     const { state, root } = entry;
     state.ctx = context(answerEl);
     root.classList.add('ab-open');
     root.querySelector('.ab-score-slot').replaceChildren(renderLocalStrip(state.ctx.local));
-    annotateHedges(answerEl);
-    runMode(answerEl, entry, 'audit');
+    runMode(answerEl, entry, AB.MODES[0].id);
   }
 
   function closePanel(answerEl, entry) {
