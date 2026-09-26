@@ -8,7 +8,7 @@ When you click "Argue Back" or use the right-click menu, the extension reads the
 
 ## What gets sent, and to whom
 
-The answer text and question are sent to whichever provider you picked in settings — [Groq](https://groq.com) or [Google Gemini](https://ai.google.dev) — so that a language model can analyze them. Nothing else on the page, and no browsing history, is ever read or sent. The request also includes the API key for that provider, which is required to use their service.
+The answer text and question are sent to whichever provider you picked in settings, [Groq](https://groq.com) or [Google Gemini](https://ai.google.dev), so that a language model can analyze them. Nothing else on the page, and no browsing history, is ever read or sent. The request also includes the API key for that provider, which is required to use their service.
 
 ## What is stored, and where
 
@@ -23,10 +23,10 @@ The answer text and question are sent to whichever provider you picked in settin
 
 ## Permissions used
 
-* `storage` — to save your API key(s) and the local result cache.
-* `activeTab` / `scripting` — to read the page you right-click on and show the floating panel, only when you invoke it.
-* `contextMenus` — to add the "Argue Back" right-click menu item.
-* Host access to supported chat sites and to Groq/Gemini's APIs — to show the inline button and make the analysis request.
+* `storage`: to save your API key(s) and the local result cache.
+* `activeTab` / `scripting`: to read the page you right-click on and show the floating panel, only when you invoke it.
+* `contextMenus`: to add the "Argue Back" right-click menu item.
+* Host access to supported chat sites and to Groq/Gemini's APIs: to show the inline button and make the analysis request.
 
 ## Contact
 

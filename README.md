@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.png" alt="Argue Back — AI answers sound confident. See how much of that is earned." width="100%">
+  <img src="assets/banner.png" alt="Argue Back: AI answers sound confident. See how much of that is earned." width="100%">
 </p>
 
 # Argue Back
@@ -44,15 +44,15 @@ Argue Back splits the work in two.
 
 **Local analysis, instant and free.** Before any network call, the extension parses the answer in your browser. It splits sentences, finds hedge words (grouped into possibility, frequency, softeners, opinion and appeals to authority), flags absolute claims like *always* and *never*, and spots sentences that rest on a condition (*if*, *assuming*, *as long as*). This runs in milliseconds.
 
-**One model call covers all four modes.** The first mode you click sends one request asking for all four analyses — the ranking behind The Decay, the invented drafts for The Graveyard, the rewrites for The Rebuild, and the sentence-by-sentence scoring for The Guess, Highlighted — back as one JSON object. Every mode after that is read from the same response, instantly, with no further network calls. Clicking through all four modes on one answer costs one request, not four. The prompt is strict either way: *do not rewrite this, analyse it, reply in JSON.* Questions that touch health, money or legal ground get graded harder automatically: hedge words like "usually" get treated as guesses unless a source is named.
+**One model call covers all four modes.** The first mode you click sends one request asking for all four analyses (the ranking behind The Decay, the invented drafts for The Graveyard, the rewrites for The Rebuild, and the sentence-by-sentence scoring for The Guess, Highlighted) back as one JSON object. Every mode after that is read from the same response, instantly, with no further network calls. Clicking through all four modes on one answer costs one request, not four. The prompt is strict either way: *do not rewrite this, analyse it, reply in JSON.* Questions that touch health, money or legal ground get graded harder automatically: hedge words like "usually" get treated as guesses unless a source is named.
 
-**Requests race, they don't queue.** Free models get busy unpredictably. Instead of trying one, waiting, then trying the next, the extension fires the best-performing model first and, if it hasn't answered within a couple of seconds, fires the next one too, without cancelling the first. Whichever answers first wins, and everything else in flight is cancelled immediately — so a single stuck model can never block the others behind it (this is the same "hedged request" pattern used to fight tail latency in large production systems). A bad key or an exhausted daily quota short-circuits this instantly rather than waiting out the whole chain, and if a key really has run out for the day, the error says exactly that and gives you the reset time, rather than the misleading "try again in a few seconds."
+**Requests race, they don't queue.** Free models get busy unpredictably. Instead of trying one, waiting, then trying the next, the extension fires the best-performing model first and, if it hasn't answered within a couple of seconds, fires the next one too, without cancelling the first. Whichever answers first wins, and everything else in flight is cancelled immediately, so a single stuck model can never block the others behind it (this is the same "hedged request" pattern used to fight tail latency in large production systems). A bad key or an exhausted daily quota short-circuits this instantly rather than waiting out the whole chain, and if a key really has run out for the day, the error says exactly that and gives you the reset time, rather than the misleading "try again in a few seconds."
 
-**Everything is cached.** Results are stored by answer, so clicking the same button twice — or reopening the panel on an answer you already checked — costs nothing and loads instantly.
+**Everything is cached.** Results are stored by answer, so clicking the same button twice, or reopening the panel on an answer you already checked, costs nothing and loads instantly.
 
 **The page is never modified.** Inline colors use the browser's CSS Custom Highlight API, and The Decay animates its own private copy of the text. Nothing about the original answer in the chat app is ever touched or rewritten.
 
-**It's covered by a real test suite.** `npm test` runs 61 checks with no dependencies and no build step: the local analyzer's sentence/hedge logic, every mode's prompt builder against edge cases (empty answers, quotes, 500-sentence walls of text), every mode's renderer against both well-formed and deliberately broken model output (missing fields, wrong types, empty arrays), and the request-racing logic itself (a stuck model gets hedged around, a bad key fails fast, an exhausted quota reports accurately). This exists because a prompt or rendering bug used to only surface when someone clicked that exact button live — now it's caught in under half a second, every time, before it ships. CI runs the same suite, plus lint and a CodeQL security scan, on every push.
+**It's covered by a real test suite.** `npm test` runs 61 checks with no dependencies and no build step: the local analyzer's sentence/hedge logic, every mode's prompt builder against edge cases (empty answers, quotes, 500-sentence walls of text), every mode's renderer against both well-formed and deliberately broken model output (missing fields, wrong types, empty arrays), and the request-racing logic itself (a stuck model gets hedged around, a bad key fails fast, an exhausted quota reports accurately). This exists because a prompt or rendering bug used to only surface when someone clicked that exact button live. Now it's caught in under half a second, every time, before it ships. CI runs the same suite, plus lint and a CodeQL security scan, on every push.
 
 ### End to end
 
@@ -74,7 +74,7 @@ flowchart LR
 
 ### One request, not four: how the model race works
 
-Free-tier models get busy unpredictably, so requests are hedged instead of tried one at a time — whichever model answers first with valid JSON wins, and everything else in flight is cancelled.
+Free-tier models get busy unpredictably, so requests are hedged instead of tried one at a time: whichever model answers first with valid JSON wins, and everything else in flight is cancelled.
 
 ```mermaid
 sequenceDiagram
@@ -85,16 +85,16 @@ sequenceDiagram
 
     X->>M1: request (combined prompt)
     Note over X: waiting ~2.5s...
-    X->>M2: hedge in — M1 hasn't answered yet
+    X->>M2: hedge in, M1 hasn't answered yet
     M2-->>X: valid JSON ✓
     X--)M1: abort
-    X--)M3: never launched — race already won
+    X--)M3: never launched, race already won
     Note over X: all 4 modes render from this one reply
 ```
 
 ## Free to run
 
-Pick a provider in settings — both are genuinely free, no card required:
+Pick a provider in settings. Both are genuinely free, no card required:
 
 | Provider | Free tier | Get a key |
 |---|---|---|
@@ -103,7 +103,7 @@ Pick a provider in settings — both are genuinely free, no card required:
 
 Each provider races its own list of free models (see "requests race" above) rather than trying them one at a time, and each keeps its own key and model choice in settings, so switching providers never overwrites the other one's setup. Click **Test key** any time to confirm a key works before relying on it.
 
-We looked at OpenRouter's free tier too, and deliberately don't use it: its free pool caps at a small number of requests **per day**, shared across every free model on the account. That's tight enough that a handful of people clicking around in one sitting can exhaust an entire day's quota — not something you want discovering mid-demo. Groq and Gemini's own free tiers are, account for account, dramatically higher.
+We looked at OpenRouter's free tier too, and deliberately don't use it: its free pool caps at a small number of requests **per day**, shared across every free model on the account. That's tight enough that a handful of people clicking around in one sitting can exhaust an entire day's quota, which is not something you want to discover mid-demo. Groq and Gemini's own free tiers are, account for account, dramatically higher.
 
 ## Install it (2 minutes)
 
@@ -135,6 +135,16 @@ Your key stays in Chrome's storage and is only ever sent to the provider you pic
 | `options.html` | Settings page for the key and model choice |
 | `styles.css` | All styling, scoped so it never leaks into the host page |
 
+## Tech stack
+
+**Extension:** plain JavaScript, Manifest V3 (background service worker, content scripts, context menus), the CSS Custom Highlight API for inline color coding, `chrome.storage.sync` for settings. No build step and no framework: it loads straight from source.
+
+**Model providers:** Groq (default) and Google Gemini, called directly over their REST APIs. No backend server, no proxy. Your key stays in your browser and talks to the provider directly.
+
+**Marketing site** (`frontend/`): TanStack Start on Vite, React, TypeScript, Tailwind CSS v4, and shadcn/ui components on top of Radix primitives. Deployed on Vercel.
+
+**Tooling:** a dependency-free Node test harness for the extension, ESLint and Prettier, GitHub Actions for CI (tests, lint, CodeQL), and Dependabot for dependency updates.
+
 ## What we deliberately did not build
 
 * **A regenerate button.** There are plenty. They make the problem worse.
@@ -147,7 +157,7 @@ Every site is one entry in `AB.SITES` inside `utils.js`: a selector for answers,
 
 ## Contributing
 
-Pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the test suite, and what a good PR looks like here. This project follows a [Code of Conduct](CODE_OF_CONDUCT.md). Found a security issue? Please see [SECURITY.md](SECURITY.md) rather than opening a public issue.
+Pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, the test suite, and what a good PR looks like here. This project follows a [Code of Conduct](CODE_OF_CONDUCT.md). Found a security issue? Please see [SECURITY.md](SECURITY.md) rather than opening a public issue.
 
 ## License
 

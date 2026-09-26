@@ -18,26 +18,26 @@ Thanks for considering a contribution. This project is a Chrome extension with n
 
 ## Before opening a pull request
 
-- Run `npm test` (or `node tests/run.js` directly) and make sure it's still green. If you touched `modes.js` or `analyzer.js`, add a fixture or edge case to `tests/run.js` that covers what you changed — see the existing fixtures for the pattern (well-formed input, missing fields, wrong types, empty arrays).
-- Run `npm run lint`. CI runs the same check on every push and PR, so a red lint run blocks merge either way — cheaper to catch it locally first.
+- Run `npm test` (or `node tests/run.js` directly) and make sure it's still green. If you touched `modes.js` or `analyzer.js`, add a fixture or edge case to `tests/run.js` that covers what you changed. See the existing fixtures for the pattern (well-formed input, missing fields, wrong types, empty arrays).
+- Run `npm run lint`. CI runs the same check on every push and PR, so a red lint run blocks merge either way, so it's cheaper to catch it locally first.
 - If you touched anything user-facing, reload the unpacked extension and check it against a real page (a chat site, or the right-click floating panel on any page) rather than relying on tests alone.
-- Keep functions small and single-purpose, and comment the *why*, not the *what* — the codebase leans on short doc comments above each function rather than long inline narration.
+- Keep functions small and single-purpose, and comment the *why*, not the *what*. The codebase leans on short doc comments above each function rather than long inline narration.
 - Match the existing tone in comments and UI copy: plain, direct, no filler.
 
 ## Coding standards
 
 - **Lint**: `npm run lint` (ESLint, flat config in `eslint.config.js`). CI enforces this.
-- **Format**: `npm run format:check` shows what Prettier would change; `npm run format` applies it. Not currently enforced in CI — the existing codebase hasn't been mass-reformatted, so treat this as a tool for new code rather than an excuse to rewrite unrelated files in your PR's diff.
-- **No build step, no bundler, no runtime dependencies.** Every top-level `.js` file is a plain classic script loaded directly by `manifest.json`. Keep it that way — don't introduce ES module `import`/`export` syntax, JSX, or a transpile step.
+- **Format**: `npm run format:check` shows what Prettier would change; `npm run format` applies it. Not currently enforced in CI, since the existing codebase hasn't been mass-reformatted, so treat this as a tool for new code rather than an excuse to rewrite unrelated files in your PR's diff.
+- **No build step, no bundler, no runtime dependencies.** Every top-level `.js` file is a plain classic script loaded directly by `manifest.json`. Keep it that way. Don't introduce ES module `import`/`export` syntax, JSX, or a transpile step.
 - **Small, single-purpose functions with a short doc comment above anything non-obvious.** See `modes.js`'s `computeDecayPlan` / `computeDecayTiming` / `buildDecayDOM` / `runDecayAnimation` for the shape this usually takes: one thing that used to be a single dense closure, broken into named steps that are individually easy to reason about and to unit-test.
 
 ## Adding support for a new AI chat site
 
-This is the most common kind of contribution. Every site is one entry in `AB.SITES` inside `utils.js`: a selector for answer elements, a selector for the user's own messages, and a way to detect whether a reply is still streaming. Add the site's host to `manifest.json`'s `host_permissions` and `content_scripts.matches`, then test on the real site — selectors written from a guess at a site's structure are exactly the kind of thing that silently breaks, so please verify against the live page before opening the PR.
+This is the most common kind of contribution. Every site is one entry in `AB.SITES` inside `utils.js`: a selector for answer elements, a selector for the user's own messages, and a way to detect whether a reply is still streaming. Add the site's host to `manifest.json`'s `host_permissions` and `content_scripts.matches`, then test on the real site. Selectors written from a guess at a site's structure are exactly the kind of thing that silently breaks, so please verify against the live page before opening the PR.
 
 ## Reporting bugs and requesting features
 
-Open an issue using the templates under **New issue**. For a bug, include the site you were on, what you clicked, and what happened instead of what you expected — a screenshot or the browser console output helps a lot.
+Open an issue using the templates under **New issue**. For a bug, include the site you were on, what you clicked, and what happened instead of what you expected. A screenshot or the browser console output helps a lot.
 
 ## Code of conduct
 
