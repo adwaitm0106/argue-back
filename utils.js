@@ -113,7 +113,7 @@ AB.extractAnswerText = (answerEl) => {
   document.body.append(holder);
   const text = holder.innerText || clone.textContent || '';
   holder.remove();
-  return text.replace(/\n{3,}/g, '\n\n').trim();
+  return text.replace(/\n{3,}/g, '\n\n').replace(/^\s*AI overview\s*/i, '').trim();
 };
 
 // The user message sitting right before this answer in document order.
