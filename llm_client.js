@@ -36,10 +36,12 @@ const PROVIDERS = {
     // free tier as of writing (still dramatically more than OpenRouter's shared
     // ~50/day). If a model in this list ever 404s as "does not exist", that's Groq
     // having moved the roster again — check https://console.groq.com/docs/models.
+    // qwen/qwen3.8-27b was dropped from this list: its free-tier output-tokens-per-
+    // minute cap (1,000) is far below MAX_OUTPUT_TOKENS, so it fails on any answer
+    // long enough to need real output, not just when busy.
     models: [
       'openai/gpt-oss-120b',
-      'openai/gpt-oss-20b',
-      'qwen/qwen3.8-27b'
+      'openai/gpt-oss-20b'
     ],
     call: callGroq,
     testKey: testGroqKey
