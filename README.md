@@ -62,7 +62,7 @@ flowchart LR
     B --> C["modes.js\none combined prompt, all 4 modes"]
     C --> D{"background.js\ncache hit?"}
     D -- yes --> H["Render instantly"]
-    D -- no --> E["llm_client.js\nraces OpenRouter / Groq / Gemini"]
+    D -- no --> E["llm_client.js\nraces the chosen provider's models"]
     E --> F["One JSON reply\n{ decay, graveyard, rebuild, audit }"]
     F --> G["Cached for this answer"]
     G --> H
@@ -94,9 +94,16 @@ sequenceDiagram
 
 ## Free to run
 
-It uses free models on OpenRouter, spread across six different upstream providers (Nvidia, Google, Alibaba, dots.llm and InclusionAI) so one provider's outage doesn't take the whole thing down — the default **Auto** setting races them (see "requests race" above) rather than trying them one at a time. You can also pin a specific model in settings.
+Pick a provider in settings — both are genuinely free, no card required:
 
-One real limit worth knowing: OpenRouter's free tier caps at a small number of requests **per day**, shared across every free model on that key — this is separate from, and much harder than, the per-model "busy right now" limiting the racing logic dodges. Click **Test key** on the settings page any time to see exactly how many free requests are left today on the key you're using. If you're demoing this and have been testing heavily beforehand, it's worth generating a fresh key, or adding a small amount of credit at [openrouter.ai/settings/credits](https://openrouter.ai/settings/credits) to raise the daily limit — both take under a minute.
+| Provider | Free tier | Get a key |
+|---|---|---|
+| **Groq** (default) | Up to 14,400 requests/day on its fastest model | [console.groq.com/keys](https://console.groq.com/keys) |
+| **Google Gemini** | 1,500 requests/day | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+
+Each provider races its own list of free models (see "requests race" above) rather than trying them one at a time, and each keeps its own key and model choice in settings, so switching providers never overwrites the other one's setup. Click **Test key** any time to confirm a key works before relying on it.
+
+We looked at OpenRouter's free tier too, and deliberately don't use it: its free pool caps at a small number of requests **per day**, shared across every free model on the account. That's tight enough that a handful of people clicking around in one sitting can exhaust an entire day's quota — not something you want discovering mid-demo. Groq and Gemini's own free tiers are, account for account, dramatically higher.
 
 ## Install it (2 minutes)
 
@@ -106,11 +113,11 @@ One real limit worth knowing: OpenRouter's free tier caps at a small number of r
    ```
 2. Open `chrome://extensions` and switch on **Developer mode** (top right)
 3. Click **Load unpacked** and pick the `argue-back` folder
-4. Click the Argue Back icon in your toolbar and paste your OpenRouter key. You can get one free at [openrouter.ai/keys](https://openrouter.ai/keys)
+4. Click the Argue Back icon in your toolbar, pick a provider, and paste its key
 5. Open [chatgpt.com](https://chatgpt.com), ask anything, and click **Argue Back** under the answer
 6. Or select text on any page, right click, and pick **Argue Back**
 
-Your key stays in Chrome's storage and is only ever sent to openrouter.ai.
+Your key stays in Chrome's storage and is only ever sent to the provider you picked.
 
 **Developer shortcut:** copy `config.example.js` to `config.js` and put your key there to skip the settings page. `config.js` is gitignored.
 
@@ -124,7 +131,7 @@ Your key stays in Chrome's storage and is only ever sent to openrouter.ai.
 | `modes.js` | The four modes. Each one has its prompt and its renderer side by side |
 | `utils.js` | Site adapters, text extraction, caching keys, inline highlighting |
 | `background.js` | Holds the key, runs the network call, owns the cache, handles the right click menu |
-| `llm_client.js` | OpenRouter client with free model fallback and robust JSON parsing |
+| `llm_client.js` | Groq/Gemini client with hedged model racing and robust JSON parsing |
 | `options.html` | Settings page for the key and model choice |
 | `styles.css` | All styling, scoped so it never leaks into the host page |
 

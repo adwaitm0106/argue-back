@@ -116,7 +116,7 @@
 
   // One request covers all four modes (see modes.js buildCombinedPrompt). Clicking
   // through Decay, Graveyard, Rebuild and Guess Highlighted on the same answer costs
-  // one OpenRouter call total, not four — one shot at a rate limit instead of four,
+  // one API call total, not four — one shot at a rate limit instead of four,
   // and every mode after the first is instant.
   async function ensureCombined(entry) {
     const { state } = entry;

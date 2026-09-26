@@ -5,7 +5,7 @@ const $ = (id) => document.getElementById(id);
 // two can never drift apart.
 const PROVIDER_IDS = Object.keys(PROVIDERS);
 
-let state = { provider: 'openrouter', keys: {}, models: {} };
+let state = { provider: 'groq', keys: {}, models: {} };
 
 function flash(text) {
   $('status').textContent = text;
@@ -65,7 +65,7 @@ $('providerGrid').addEventListener('click', (e) => {
 
 chrome.storage.sync.get(['provider', 'keys', 'models'], (saved) => {
   state = {
-    provider: PROVIDER_IDS.includes(saved.provider) ? saved.provider : 'openrouter',
+    provider: PROVIDER_IDS.includes(saved.provider) ? saved.provider : 'groq',
     keys: saved.keys || {},
     models: saved.models || {}
   };
@@ -85,8 +85,8 @@ $('clear').addEventListener('click', () => {
 });
 
 // A plain GET against each provider's own cheap validation endpoint (see llm_client.js):
-// confirms the key works, and for OpenRouter, shows today's remaining free quota —
-// without spending a single request against that same quota to find out.
+// confirms the key works, and reports remaining daily quota for any provider that
+// exposes one, without spending a single request against that same quota to find out.
 $('testKey').addEventListener('click', () => {
   const provider = state.provider;
   const apiKey = $('apiKey').value.trim();
@@ -102,7 +102,7 @@ $('testKey').addEventListener('click', () => {
     if (!res.quota || res.quota.limit == null) return setKeyStatus('✓ Key works.', 'ok');
     const { used, limit, remaining } = res.quota;
     if (remaining <= 0) {
-      setKeyStatus(`⚠ Key is valid, but today's free quota is used up (${used}/${limit}). Add credit at openrouter.ai, or use a different key.`, 'warn');
+      setKeyStatus(`⚠ Key is valid, but today's free quota is used up (${used}/${limit}). Try a different key.`, 'warn');
     } else if (remaining <= 5) {
       setKeyStatus(`✓ Key works — only ${remaining} of ${limit} free requests left today.`, 'warn');
     } else {

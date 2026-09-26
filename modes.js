@@ -262,7 +262,7 @@
   // One combined call instead of four. Every mode's individual buildPrompt above
   // stays as-is (and stays covered by the test suite), but the running extension
   // uses this instead: one request that asks for all four analyses in one JSON
-  // object, so clicking through all four modes on an answer costs one OpenRouter
+  // object, so clicking through all four modes on an answer costs one
   // call, not four. That's four fewer chances to hit a free-tier rate limit on
   // the same answer, and it's faster for the person clicking around too.
   AB.buildCombinedPrompt = (answer, question, local) => {

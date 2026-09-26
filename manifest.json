@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Argue Back",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Take apart any AI answer four ways: watch it delete its own filler, see its rejected drafts, watch it get rephrased, or see what it knows versus what it's guessing.",
   "permissions": [
     "storage",
@@ -25,7 +25,6 @@
     "https://www.google.com.au/search*",
     "https://www.google.de/search*",
     "https://www.google.fr/search*",
-    "https://openrouter.ai/*",
     "https://api.groq.com/*",
     "https://generativelanguage.googleapis.com/*"
   ],

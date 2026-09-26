@@ -22,7 +22,7 @@ We'll acknowledge reports as quickly as we can and work with you on a fix before
 
 Relevant areas of this project, roughly by risk:
 - **Extension permissions and content-script injection** (`manifest.json`, `background.js`) — anything that could grant a page more access than intended.
-- **The OpenRouter key's storage and handling** (`background.js`, `options.js`) — it should never leave `chrome.storage.sync` except in a request to `openrouter.ai`.
+- **API key storage and handling** (`background.js`, `options.js`) — a key should never leave `chrome.storage.sync` except in a request to the provider it belongs to (Groq or Gemini).
 - **Inline rendering of model output** (`modes.js`) — model responses are untrusted input; anything that could turn a crafted response into script execution is in scope.
 
-Out of scope: issues in OpenRouter's own service, or in a third-party AI chat site the extension runs on.
+Out of scope: issues in Groq's or Google's own services, or in a third-party AI chat site the extension runs on.

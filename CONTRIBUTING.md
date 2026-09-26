@@ -9,7 +9,7 @@ Thanks for considering a contribution. This project is a Chrome extension with n
    git clone https://github.com/adwaitm0106/argue-back.git
    ```
    Then `chrome://extensions` → **Developer mode** → **Load unpacked** → select the `argue-back` folder.
-2. Copy `config.example.js` to `config.js` and paste an [OpenRouter key](https://openrouter.ai/keys) in, so you don't need to go through the settings page while iterating. `config.js` is gitignored and never committed.
+2. Copy `config.example.js` to `config.js` and paste a [Groq key](https://console.groq.com/keys) in, so you don't need to go through the settings page while iterating. `config.js` is gitignored and never committed.
 3. Run the test suite before and after your change:
    ```bash
    node tests/run.js

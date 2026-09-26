@@ -226,11 +226,11 @@ test('combined fixture: a mode key missing entirely still renders (falls back to
   var LLM = {};
   new Function('exports', llmSrc +
     '\nexports.parseJSON = parseJSON; exports.callLLM = callLLM; exports.PROVIDERS = PROVIDERS; ' +
-    'exports.testProviderKey = testProviderKey; exports.callOpenRouter = callOpenRouter; ' +
+    'exports.testProviderKey = testProviderKey; exports.raceModels = raceModels; ' +
     'exports.callGroq = callGroq; exports.callGemini = callGemini;')(LLM);
 }
 
-const or = (model) => ({ provider: 'openrouter', apiKey: 'fake-key', model });
+const groq = (model) => ({ provider: 'groq', apiKey: 'fake-key', model });
 
 test('parseJSON: parses a clean JSON object', () => {
   assert.deepStrictEqual(LLM.parseJSON('{"ok":true}'), { ok: true });
@@ -252,8 +252,8 @@ test('parseJSON: throws a clear error on genuinely non-JSON output', () => {
   assert.throws(() => LLM.parseJSON('I cannot help with that.'), /did not return JSON/);
 });
 
-test('PROVIDERS: all three are registered with a call fn, a test-key fn, and a model list', () => {
-  for (const id of ['openrouter', 'groq', 'gemini']) {
+test('PROVIDERS: both are registered with a call fn, a test-key fn, and a model list', () => {
+  for (const id of ['groq', 'gemini']) {
     const p = LLM.PROVIDERS[id];
     assert(p, `missing provider "${id}"`);
     assert(typeof p.call === 'function');
@@ -262,18 +262,13 @@ test('PROVIDERS: all three are registered with a call fn, a test-key fn, and a m
   }
 });
 
-// These four share `global.fetch` as their mock point, so they run as one sequential
-// async test rather than four separate ones — separate `test()` calls would fire
-// concurrently (test() doesn't await), and whichever mock got assigned last would win
-// for all of them, silently corrupting whichever ran its real request after the
-// reassignment.
-// All of these share `global.fetch` as their mock point, so — same lesson learned
-// earlier in this file — they run as ONE sequential async test, not several. Separate
-// `test()` calls fire concurrently (test() doesn't await), and whichever mock got
-// assigned last would silently win for every one of them, corrupting the results of
-// any that had a real request still in flight when the reassignment happened.
-test('callLLM and each provider adapter: hedging, failures, and provider-specific shapes', async () => {
-  const models = LLM.PROVIDERS.openrouter.models;
+// All of these share `global.fetch` as their mock point, so they run as ONE sequential
+// async test, not several — separate `test()` calls fire concurrently (test() doesn't
+// await), and whichever mock got assigned last would silently win for every one of
+// them, corrupting the results of any that had a real request still in flight when the
+// reassignment happened.
+test('callLLM (groq) and each provider adapter: hedging, failures, and provider-specific shapes', async () => {
+  const models = LLM.PROVIDERS.groq.models;
 
   // 1) The first model hangs forever; the second (hedged in after hedgeDelayMs) answers
   //    correctly. The hung model's request must be the one that gets aborted, not the winner.
@@ -286,43 +281,19 @@ test('callLLM and each provider adapter: hedging, failures, and provider-specifi
     }
     return { ok: true, json: async () => ({ choices: [{ message: { content: '{"decay":{}}' } }], model: body.model }) };
   };
-  const result = await LLM.callLLM(or('auto'), 'prompt', 20);
+  const result = await LLM.callLLM(groq('auto'), 'prompt', 20);
   assert.deepStrictEqual(result.json, { decay: {} });
   assert.notStrictEqual(result.model, models[0]);
 
   // 2) Every model fails the same way — a clear, actionable error, not a hang or a crash.
   global.fetch = async () => ({ ok: false, status: 500, json: async () => ({ error: { message: 'boom' } }) });
-  await assert.rejects(() => LLM.callLLM(or('auto'), 'prompt', 20), /All free models failed/);
+  await assert.rejects(() => LLM.callLLM(groq('auto'), 'prompt', 20), /All free models failed/);
 
   // 3) A 401 should short-circuit with a specific "check your key" message, not the generic one.
   global.fetch = async () => ({ ok: false, status: 401, json: async () => ({ error: { message: 'Unauthorized', code: 401 } }) });
-  await assert.rejects(() => LLM.callLLM(or('auto'), 'prompt', 20), /was rejected/);
+  await assert.rejects(() => LLM.callLLM(groq('auto'), 'prompt', 20), /was rejected/);
 
-  // 4) An exhausted daily free-tier quota (real shape, confirmed against OpenRouter live)
-  //    must also short-circuit instantly, and must say "retrying won't help", not the
-  //    generic transient-failure message — that advice would be actively wrong here.
-  global.fetch = async () => ({
-    ok: false,
-    status: 429,
-    json: async () => ({
-      error: {
-        message: 'Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day',
-        code: 429,
-        metadata: { limit_source: 'openrouter_free_tier_daily', headers: { 'X-RateLimit-Reset': String(Date.now() + 3600000) } }
-      }
-    })
-  });
-  await assert.rejects(() => LLM.callLLM(or('auto'), 'prompt', 20), /won't help until the reset/);
-
-  // 5) Groq: same OpenAI-shaped request/response as OpenRouter, just a different host.
-  global.fetch = async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: '{"ok":true}' } }], model: 'llama-3.1-8b-instant' }) });
-  const groqOk = await LLM.callGroq('gsk_fake', 'llama-3.1-8b-instant', 'prompt', new AbortController().signal);
-  assert.deepStrictEqual(LLM.parseJSON(groqOk.content), { ok: true });
-
-  global.fetch = async () => ({ ok: false, status: 401, json: async () => ({ error: { message: 'Invalid API Key' } }) });
-  await assert.rejects(() => LLM.callGroq('bad', 'llama-3.1-8b-instant', 'prompt', new AbortController().signal), /Invalid API Key/);
-
-  // 6) Gemini: a genuinely different shape — key in the query string, content nested
+  // 4) Gemini: a genuinely different shape — key in the query string, content nested
   //    under candidates[].content.parts[], not choices[].message.content.
   global.fetch = async (url) => {
     assert(url.includes('generateContent'), 'should hit the generateContent action');
@@ -340,6 +311,22 @@ test('callLLM and each provider adapter: hedging, failures, and provider-specifi
   } catch (err) {
     assert.strictEqual(err.status, 401);
   }
+});
+
+// No current provider sets .isDailyQuota (that was OpenRouter's, since removed —
+// see llm_client.js), but the generic short-circuit machinery in raceModels() stays,
+// for whichever future provider needs the same "don't wait out the whole hedge chain
+// for identical bad news" treatment. Exercised directly against a synthetic
+// callModel rather than through any real provider.
+test('raceModels: a provider-reported daily quota short-circuits with an accurate message', async () => {
+  const resetAt = Date.now() + 3600000;
+  const callModel = async () => {
+    throw Object.assign(new Error('quota exceeded'), { isDailyQuota: true, resetAt, upgradeUrl: 'example.com/upgrade' });
+  };
+  await assert.rejects(
+    () => LLM.raceModels(callModel, 'fake-key', ['model-a', 'model-b'], 'prompt', 20),
+    /won't help until the reset/
+  );
 });
 
 test('testProviderKey: reports a missing key without making a network call', async () => {

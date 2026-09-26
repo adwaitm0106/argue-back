@@ -21,7 +21,7 @@
     #keyStatus.error { color: #d6453d; }
     #status { color: #1f9d55; }
     small { color: #777; }
-    .provider-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+    .provider-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px; }
     .provider-card {
       border: 2px solid #ddd; border-radius: 10px; padding: 10px; cursor: pointer; text-align: center; font-size: 13px;
     }
@@ -36,10 +36,6 @@
 
   <label>Provider</label>
   <div class="provider-grid" id="providerGrid">
-    <div class="provider-card" data-provider="openrouter">
-      <b>OpenRouter</b>
-      <span>~50 free req/day</span>
-    </div>
     <div class="provider-card" data-provider="groq">
       <b>Groq</b>
       <span>up to 14,400/day</span>

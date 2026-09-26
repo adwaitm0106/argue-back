@@ -65,7 +65,7 @@ module.exports = [
     // they're real globals at runtime, just defined in a sibling file.
     files: ['background.js'],
     languageOptions: {
-      globals: { OPENROUTER_KEY: 'readonly', callLLM: 'readonly', testProviderKey: 'readonly' }
+      globals: { GROQ_KEY: 'readonly', callLLM: 'readonly', testProviderKey: 'readonly' }
     }
   },
   {
@@ -88,7 +88,7 @@ module.exports = [
   },
   {
     // config.js/config.example.js exist purely to be picked up by background.js's
-    // importScripts() — declaring OPENROUTER_KEY is their entire job, "unused" here
+    // importScripts() — declaring GROQ_KEY is their entire job, "unused" here
     // is by design.
     files: ['config.js', 'config.example.js'],
     rules: { 'no-unused-vars': 'off' }

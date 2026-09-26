@@ -5,14 +5,14 @@ importScripts('llm_client.js');
 
 const CACHE_LIMIT = 200;
 
-// Storage shape: { provider: 'openrouter'|'groq'|'gemini', keys: { <provider>: '...' },
+// Storage shape: { provider: 'groq'|'gemini', keys: { <provider>: '...' },
 // models: { <provider>: 'auto' | a specific model id } }. Each provider keeps its own
 // key and model choice, so switching providers in settings never clobbers the other
 // provider's saved setup.
 async function getSettings() {
   const { provider, keys, models } = await chrome.storage.sync.get(['provider', 'keys', 'models']);
-  const activeProvider = provider || 'openrouter';
-  const fallbackKey = activeProvider === 'openrouter' && typeof OPENROUTER_KEY !== 'undefined' ? OPENROUTER_KEY : '';
+  const activeProvider = provider || 'groq';
+  const fallbackKey = activeProvider === 'groq' && typeof GROQ_KEY !== 'undefined' ? GROQ_KEY : '';
   return {
     provider: activeProvider,
     apiKey: (keys && keys[activeProvider]) || fallbackKey,
@@ -40,7 +40,7 @@ async function writeCache(key, value) {
 // A plain GET (no chat completion, no tokens spent) so testing a key never eats into
 // the very quota it's there to check.
 async function handleTestKey({ provider, apiKey }) {
-  return testProviderKey(provider || 'openrouter', apiKey);
+  return testProviderKey(provider || 'groq', apiKey);
 }
 
 async function handleAnalyze({ cacheKey, prompt }) {

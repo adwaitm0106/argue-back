@@ -14,35 +14,16 @@ const SYSTEM_PROMPT =
 const MAX_OUTPUT_TOKENS = 3600;
 
 // ---------------------------------------------------------------------------
-// Providers. Each free tier has a different daily ceiling, so offering more than
-// just OpenRouter matters: OpenRouter's free pool caps around 50 requests/day per
-// account (shared across every free model on it), while Groq and Gemini's own free
-// tiers are, account for account, dramatically higher — see each provider's models
-// list below for the numbers, sourced from their own docs.
+// Providers. OpenRouter used to be one of these — dropped entirely after its
+// free pool (a shared ~50 requests/day across the whole account, not per model)
+// turned out to be too tight to survive a demo audience clicking around: a
+// handful of judges trying a couple of modes each could exhaust an entire day's
+// quota in minutes. Groq and Gemini's free tiers are, account for account,
+// dramatically higher — see each provider's models list below for the numbers,
+// sourced from their own docs.
 // ---------------------------------------------------------------------------
 
 const PROVIDERS = {
-  openrouter: {
-    label: 'OpenRouter',
-    keyUrl: 'https://openrouter.ai/keys',
-    keyHint: 'sk-or-v1-...',
-    // Deliberately spans several different upstream providers (Nvidia, Google,
-    // Alibaba, InclusionAI, dots.llm) so one provider's outage doesn't take down the
-    // whole chain. Reasoning-heavy free models are deliberately excluded: several
-    // (liquid/lfm-2.5, cohere/north-mini-code) were tested and found to burn their
-    // whole token budget on hidden "reasoning" text, returning empty content —
-    // worse than just being slow.
-    models: [
-      'nvidia/nemotron-3-super-120b-a12b:free',
-      'dots-studio/dots-3-note-preview:free',
-      'inclusionai/ling-3.0-flash-sante:free',
-      'google/gemma-4-31b-it:free',
-      'nvidia/nemotron-3-ultra-550b-a55b:free',
-      'qwen/qwen3.8-27b:free'
-    ],
-    call: callOpenRouter,
-    testKey: testOpenRouterKey
-  },
   groq: {
     label: 'Groq',
     keyUrl: 'https://console.groq.com/keys',
@@ -73,60 +54,9 @@ const PROVIDERS = {
 };
 
 // ---------------------------------------------------------------------------
-// OpenRouter — OpenAI-style chat completions, one shared account-wide daily quota.
-// ---------------------------------------------------------------------------
-
-async function callOpenRouter(apiKey, model, prompt, signal) {
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    signal,
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://github.com/adwaitm0106/argue-back',
-      'X-Title': 'Argue Back'
-    },
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'system', content: SYSTEM_PROMPT }, { role: 'user', content: prompt }],
-      temperature: 0.3,
-      max_tokens: MAX_OUTPUT_TOKENS
-    })
-  });
-
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.error) {
-    const err = new Error((data.error && data.error.message) || `HTTP ${res.status}`);
-    err.status = (data.error && data.error.code) || res.status;
-    // OpenRouter's free tier caps at a small number of requests PER DAY, shared across
-    // every free model on the account — separate from, and much harder than, the
-    // per-model "busy right now" 429s hedging is meant to route around. Tag it so
-    // the race logic can give an accurate message instead of "try again in a few
-    // seconds", which is actively wrong here: no amount of retrying helps until reset.
-    if (data.error && data.error.metadata && data.error.metadata.limit_source === 'openrouter_free_tier_daily') {
-      err.isDailyQuota = true;
-      err.resetAt = Number(data.error.metadata.headers && data.error.metadata.headers['X-RateLimit-Reset']) || null;
-      err.upgradeUrl = 'openrouter.ai/settings/credits';
-    }
-    throw err;
-  }
-  const content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-  if (!content || !content.trim()) throw new Error('Empty reply');
-  return { content, model: data.model || model };
-}
-
-async function testOpenRouterKey(apiKey) {
-  const res = await fetch('https://openrouter.ai/api/v1/key', { headers: { Authorization: `Bearer ${apiKey}` } });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) return { ok: false, error: (data.error && data.error.message) || `HTTP ${res.status}` };
-  const q = data.data && data.data.free_model_daily_requests;
-  return { ok: true, quota: q ? { used: q.used, limit: q.limit, remaining: q.remaining } : null };
-}
-
-// ---------------------------------------------------------------------------
-// Groq — also OpenAI-style, so this is nearly identical to OpenRouter's, just
-// pointed at Groq's own endpoint and without OpenRouter's daily-quota metadata
-// (Groq's free tier is a plain per-model rate limit, handled like any other 429).
+// Groq — OpenAI-style chat completions. Groq's free tier is a plain per-model
+// rate limit, no account-wide daily quota to special-case — handled like any
+// other 429 by the generic race logic below.
 // ---------------------------------------------------------------------------
 
 async function callGroq(apiKey, model, prompt, signal) {
@@ -308,7 +238,7 @@ async function raceModels(callModel, apiKey, models, prompt, hedgeDelayMs) {
  * as hedges behind it, rather than being a hard pin with no fallback at all.
  */
 async function callLLM(settings, prompt, hedgeDelayMs = HEDGE_DELAY_MS) {
-  const provider = PROVIDERS[settings.provider] || PROVIDERS.openrouter;
+  const provider = PROVIDERS[settings.provider] || PROVIDERS.groq;
   const models = settings.model && settings.model !== 'auto'
     ? [settings.model, ...provider.models.filter(m => m !== settings.model)]
     : provider.models;
@@ -317,7 +247,7 @@ async function callLLM(settings, prompt, hedgeDelayMs = HEDGE_DELAY_MS) {
 
 /** Validates a key against whichever provider it's meant for, with no generation cost. */
 async function testProviderKey(providerId, apiKey) {
-  const provider = PROVIDERS[providerId] || PROVIDERS.openrouter;
+  const provider = PROVIDERS[providerId] || PROVIDERS.groq;
   if (!apiKey) return { ok: false, error: 'Paste a key first.' };
   try {
     return await provider.testKey(apiKey);
