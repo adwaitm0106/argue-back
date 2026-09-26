@@ -55,3 +55,26 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 });
 
 chrome.action.onClicked.addListener(() => chrome.runtime.openOptionsPage());
+
+// Right click any selected text on any site to argue back against it.
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({ id: 'argue-back-selection', title: 'Argue Back on "%s"', contexts: ['selection'] });
+});
+
+const CONTENT_FILES = ['utils.js', 'analyzer.js', 'modes.js', 'content_script.js'];
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId !== 'argue-back-selection' || !tab || !tab.id) return;
+  const target = { tabId: tab.id, frameIds: [info.frameId || 0] };
+  // Prefer the full selection with line breaks; the menu's selectionText flattens them.
+  let text = info.selectionText || '';
+  try {
+    const [{ result }] = await chrome.scripting.executeScript({ target, func: () => String(getSelection()) });
+    if (result && result.trim()) text = result;
+    await chrome.scripting.insertCSS({ target, files: ['styles.css'] });
+    await chrome.scripting.executeScript({ target, files: CONTENT_FILES });
+  } catch (_) {
+    return; // chrome:// pages and the web store block injection
+  }
+  chrome.tabs.sendMessage(tab.id, { type: 'floating', text }, { frameId: info.frameId || 0 });
+});

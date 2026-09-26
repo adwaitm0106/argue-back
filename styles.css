@@ -163,3 +163,19 @@
 ::highlight(ab-infer) { background-color: rgba(229, 168, 0, .22); }
 ::highlight(ab-guess) { background-color: rgba(214, 69, 61, .2); }
 ::highlight(ab-hedge) { text-decoration: underline wavy #e5484d; text-underline-offset: 3px; color: inherit; }
+
+/* Floating panel for text selected on any website */
+.ab-float {
+  position: fixed; right: 20px; top: 20px; z-index: 2147483646;
+  width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 40px); overflow: auto;
+  background: #fff; color: #1d1d1f; border: 1px solid #e4e4e9; border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, .22); padding: 14px 16px;
+  font: 14px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  animation: ab-in .18s ease-out;
+}
+.ab-float-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.ab-float-src { color: #6b6b73; font-size: 12px; }
+.ab-float-x { margin-left: auto; background: none; border: 0; font-size: 22px; line-height: 1; cursor: pointer; color: #6b6b73; }
+.ab-float-answer { max-height: 220px; overflow: auto; padding: 8px 10px; background: #f6f6f8; border-radius: 8px; }
+.ab-float-answer p { margin: 0 0 8px; }
+.ab-float .ab-root { margin-bottom: 0; }

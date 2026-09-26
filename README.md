@@ -25,6 +25,14 @@ We went the other way. **We don't regenerate anything.** We audit the answer you
 
 That's the moment it clicks. The answer wasn't as solid as it sounded.
 
+## Works where you already are
+
+**Inside AI chats.** The button shows up under every answer on ChatGPT, Gemini, Perplexity, Microsoft Copilot, DeepSeek, Grok and Mistral Le Chat.
+
+**On any website.** Select any text, right click, and choose **Argue Back**. A floating panel opens with the same scorecard and all six modes. Use it on Google's AI Overviews, a Stack Overflow answer, a news article, a product page, or a LinkedIn post that sounds a little too sure of itself.
+
+That second part matters. AI written text isn't only in chat windows anymore. It's in search results, emails and articles, and it all sounds equally confident.
+
 ## Six ways to argue back
 
 After the first click, six modes open up. Each one looks at the same answer from a different angle.
@@ -83,6 +91,7 @@ It uses free models on OpenRouter, so a full demo costs nothing. The default is 
 3. Click **Load unpacked** and pick the `argue-back` folder
 4. Click the Argue Back icon in your toolbar and paste your OpenRouter key. You can get one free at [openrouter.ai/keys](https://openrouter.ai/keys)
 5. Open [chatgpt.com](https://chatgpt.com), ask anything, and click **Argue Back** under the answer
+6. Or select text on any page, right click, and pick **Argue Back**
 
 Your key stays in Chrome's storage and is only ever sent to openrouter.ai.
 
@@ -97,7 +106,7 @@ Your key stays in Chrome's storage and is only ever sent to openrouter.ai.
 | `analyzer.js` | Local parsing: sentences, hedges, claims, premises, hedge density |
 | `modes.js` | The six modes. Each one has its prompt and its renderer side by side |
 | `utils.js` | Site adapters, text extraction, caching keys, inline highlighting |
-| `background.js` | Holds the key, runs the network call, owns the cache |
+| `background.js` | Holds the key, runs the network call, owns the cache, handles the right click menu |
 | `llm_client.js` | OpenRouter client with free model fallback and robust JSON parsing |
 | `options.html` | Settings page for the key and model choice |
 | `styles.css` | All styling, scoped so it never leaks into the host page |

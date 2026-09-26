@@ -15,10 +15,46 @@ AB.SITES = {
     questions: '[data-testid="user-message"]',
     input: '[contenteditable="true"]',
     isStreaming: () => !!document.querySelector('[data-is-streaming="true"]')
+  },
+  'gemini.google.com': {
+    answers: 'model-response message-content',
+    questions: 'user-query',
+    input: 'rich-textarea [contenteditable="true"]',
+    isStreaming: () => !!document.querySelector('model-response [aria-busy="true"], .stop-icon')
+  },
+  'perplexity.ai': {
+    answers: '[id^="markdown-content"], div.prose',
+    questions: '[class*="group/query"], h1',
+    input: 'textarea, #ask-input',
+    isStreaming: () => !!document.querySelector('button[aria-label*="Stop"]')
+  },
+  'copilot.microsoft.com': {
+    answers: '[data-content="ai-message"]',
+    questions: '[data-content="user-message"]',
+    input: 'textarea',
+    isStreaming: () => !!document.querySelector('button[aria-label*="Stop"]')
+  },
+  'chat.deepseek.com': {
+    answers: '.ds-markdown',
+    questions: '[class*="user"] [class*="message"], .fbb737a4',
+    input: 'textarea',
+    isStreaming: () => !!document.querySelector('[class*="stop"]')
+  },
+  'grok.com': {
+    answers: '[class*="items-start"] .message-bubble',
+    questions: '[class*="items-end"] .message-bubble',
+    input: 'textarea, [contenteditable="true"]',
+    isStreaming: () => !!document.querySelector('button[aria-label*="Stop"]')
+  },
+  'chat.mistral.ai': {
+    answers: '[data-message-author-role="assistant"]',
+    questions: '[data-message-author-role="user"]',
+    input: 'textarea',
+    isStreaming: () => !!document.querySelector('button[aria-label*="Stop"]')
   }
 };
 
-AB.site = AB.SITES[location.hostname.replace(/^www\./, '')];
+AB.site = AB.SITES[location.hostname.replace(/^www\./, '')] || null;
 
 AB.el = (tag, attrs = {}, children = []) => {
   const node = document.createElement(tag);

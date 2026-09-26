@@ -2,7 +2,9 @@
 
 (() => {
   const AB = window.AB;
-  if (!AB.site) return;
+  // Scripts can be injected twice (manifest match plus right click injection). Run once.
+  if (AB.loaded) return;
+  AB.loaded = true;
   const { el } = AB;
 
   const bars = new WeakMap(); // answer element -> { root, state }
@@ -99,7 +101,7 @@
 
   function context(answerEl) {
     const answer = AB.extractAnswerText(answerEl);
-    const question = AB.extractQuestion(answerEl);
+    const question = answerEl.dataset.abQuestion || AB.extractQuestion(answerEl);
     return { answer, question, local: AB.analyzer.analyze(answer) };
   }
 
@@ -219,6 +221,34 @@
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Any website: right click selected text, get a floating Argue Back panel.
+  // ---------------------------------------------------------------------------
+
+  function openFloating(text) {
+    document.querySelector('.ab-float')?.remove();
+    const answerEl = el('div', { class: 'ab-float-answer' },
+      text.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean).map(p => el('p', { text: p })));
+    answerEl.dataset.abQuestion = `(Selected from ${location.hostname}: ${document.title})`;
+    const entry = buildBar(answerEl);
+    const shell = el('div', { class: 'ab-float' }, [
+      el('div', { class: 'ab-float-head' }, [
+        el('b', { text: 'Argue Back' }),
+        el('span', { class: 'ab-float-src', text: location.hostname }),
+        el('button', { class: 'ab-float-x', title: 'Close', text: '×', onclick: () => { AB.clearHighlights(answerEl); shell.remove(); } })
+      ]),
+      answerEl,
+      entry.root
+    ]);
+    document.body.append(shell);
+    argueBack(answerEl, entry);
+  }
+
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg && msg.type === 'floating' && msg.text) openFloating(msg.text);
+  });
+
+  if (!AB.site) return;
   let timer = null;
   const schedule = () => { clearTimeout(timer); timer = setTimeout(injectAll, 700); };
   new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true, characterData: true });
