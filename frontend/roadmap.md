@@ -1,0 +1,7 @@
+- [x] Restyle Home with forest/lime editorial layout and a moving image background.
+- [x] Add How It Works and About pages with shared navigation.
+- [x] Verify the demo and all three pages on desktop and mobile.
+- [x] Simplify the live Decay example and smooth its sentence removal.
+- [x] Present all four modes as planned live features rather than coming soon.
+- [x] Make Home, How It Works, and About read as connected chapters with a green-to-dark-blue progression; preserve direct page URLs.
+- [x] Verify the new flow and Decay interaction on desktop and mobile.

@@ -1,0 +1,149 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-hairline: var(--hairline);
+  --color-light-line: var(--light-line);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-sans-ui);
+}
+
+:root {
+  --radius: 0rem;
+
+  /* forest, lime, and paper: the selected editorial palette */
+  --background: #f3f1e6;
+  --foreground: #071d18;
+  --card: #f3f1e6;
+  --card-foreground: #071d18;
+  --popover: #f3f1e6;
+  --popover-foreground: #071d18;
+  --primary: #d8ef9a;
+  --primary-foreground: #071d18;
+  --secondary: #154e3c;
+  --secondary-foreground: #f3f1e6;
+  --muted: #e4e9d9;
+  --muted-foreground: #52665a;
+  --accent: #d8ef9a;
+  --accent-foreground: #071d18;
+  --destructive: #154e3c;
+  --destructive-foreground: #f3f1e6;
+  --border: #071d1833;
+  --hairline: #071d1833;
+  --light-line: #f3f1e64d;
+  --input: #071d1833;
+  --ring: #d8ef9a;
+  --night: #071d18;
+  --forest: #154e3c;
+  --paper: #f3f1e6;
+  --lime: #d8ef9a;
+  --deep-blue: #101d30;
+  --font-display: "Instrument Serif", Georgia, serif;
+  --font-sans-ui: "Work Sans", system-ui, sans-serif;
+}
+
+@theme inline {
+  --color-night: var(--night);
+  --color-forest: var(--forest);
+  --color-paper: var(--paper);
+  --color-lime: var(--lime);
+  --color-deep-blue: var(--deep-blue);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans-ui);
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+.silk-backdrop {
+  position: absolute;
+  inset: 0;
+  background-color: var(--night);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.18'/%3E%3C/svg%3E"), radial-gradient(circle at 47% 55%, transparent 52%, var(--night) 100%), linear-gradient(var(--silk-angle, 90deg), var(--night) 0%, var(--forest) 100%);
+  background-size: 120px 120px, auto, auto;
+  background-blend-mode: overlay, normal, normal;
+}
+
+.reel-mask {
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--night) 45%, transparent), color-mix(in srgb, var(--night) 65%, transparent) 55%, var(--night));
+}
+
+html { scroll-behavior: smooth; }
+
+.chapter-how {
+  background: linear-gradient(150deg, var(--forest) 0%, #123e3e 38%, #142b3b 75%, var(--deep-blue) 100%);
+}
+.chapter-about {
+  background: linear-gradient(155deg, var(--deep-blue) 0%, #142d3d 54%, #113039 100%);
+}
+.decay-sentence {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  filter: blur(0);
+  transition: grid-template-rows 840ms cubic-bezier(.22, 1, .36, 1), opacity 700ms ease, filter 840ms ease;
+}
+.decay-sentence > span { min-height: 0; overflow: hidden; }
+.decay-sentence-exit { grid-template-rows: 0fr; opacity: 0; filter: blur(5px); }
+
+@utility hairline-t {
+  border-top: 1px solid var(--hairline);
+}
+
+@utility decay-out {
+  animation: decay-out 620ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes decay-out {
+  0% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  40% {
+    opacity: 0.55;
+    filter: blur(2px);
+  }
+  100% {
+    opacity: 0;
+    filter: blur(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .decay-out { animation: none; }
+  html { scroll-behavior: auto; }
+  .decay-sentence { transition: none; }
+}
