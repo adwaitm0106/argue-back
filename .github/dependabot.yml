@@ -1,8 +1,14 @@
 version: 2
 updates:
-  # This project has no npm dependencies (see package.json), so this only tracks the
-  # GitHub Actions used in .github/workflows/ for security updates.
+  # GitHub Actions used in .github/workflows/.
   - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # ESLint and Prettier are the only dependencies this project has, and they're both
+  # dev-only — the extension itself still ships with zero runtime dependencies.
+  - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"

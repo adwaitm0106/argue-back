@@ -37,7 +37,7 @@
       const line = block.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '').trim();
       if (!line) continue;
       let buf = '';
-      const parts = line.split(/(?<=[.!?])\s+(?=[A-Z0-9"'(\[])/);
+      const parts = line.split(/(?<=[.!?])\s+(?=[A-Z0-9"'([])/);
       for (const p of parts) {
         buf = buf ? `${buf} ${p}` : p;
         if (ABBREVIATIONS.test(buf)) continue;

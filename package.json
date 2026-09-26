@@ -6,9 +6,17 @@
   "homepage": "https://github.com/adwaitm0106/argue-back",
   "license": "MIT",
   "scripts": {
-    "test": "node tests/run.js"
+    "test": "node tests/run.js",
+    "lint": "eslint .",
+    "format": "prettier --write \"*.{js,html,css,json,md}\" \"tests/*.js\" \".github/**/*.{yml,md}\"",
+    "format:check": "prettier --check \"*.{js,html,css,json,md}\" \"tests/*.js\" \".github/**/*.{yml,md}\""
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.11.0",
+    "prettier": "^3.9.9"
   }
 }

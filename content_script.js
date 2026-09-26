@@ -43,7 +43,7 @@
   }
 
   function renderScorecard(card, local) {
-    const seg = (cls, value, label) => value > 0 && el('div', { class: `ab-seg ${cls}`, style: `flex:${value}` }, value >= 8 ? `${value}%` : '');
+    const seg = (cls, value) => value > 0 && el('div', { class: `ab-seg ${cls}`, style: `flex:${value}` }, value >= 8 ? `${value}%` : '');
     return el('div', { class: 'ab-scorecard' }, [
       el('div', { class: 'ab-score-head' }, [
         el('span', { class: 'ab-score-title', text: 'How solid is this answer?' }),

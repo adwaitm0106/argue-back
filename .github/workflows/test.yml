@@ -20,5 +20,11 @@ jobs:
       - name: Validate manifest.json is well-formed
         run: node -e "JSON.parse(require('fs').readFileSync('manifest.json', 'utf8')); console.log('manifest.json OK')"
 
+      - name: Install dev dependencies (ESLint, Prettier — no runtime dependencies exist)
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
       - name: Run the test suite
         run: npm test
