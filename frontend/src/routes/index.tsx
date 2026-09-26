@@ -110,12 +110,17 @@ function Index() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main>
-        <section className="relative isolate overflow-hidden bg-night text-paper [--foreground:var(--paper)]">
-          <SilkBackdrop />
-          <div className="pointer-events-none absolute inset-0 opacity-65" aria-hidden="true">
-            <MorphGallery items={REEL} height="100%" className="h-full" autoplay={4100} duration={1900} loop arrows={false} thumbnails={false} />
+        <section className="relative isolate bg-night text-paper [--foreground:var(--paper)]">
+          {/* Decorative background only — clipped to the section on its own, so the
+              "Argue back" dropdown below (which intentionally overflows past the
+              section once open) doesn't get cut off by a section-wide overflow-hidden. */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+            <SilkBackdrop />
+            <div className="absolute inset-0 opacity-65">
+              <MorphGallery items={REEL} height="100%" className="h-full" autoplay={4100} duration={1900} loop arrows={false} thumbnails={false} />
+            </div>
+            <div className="reel-mask absolute inset-0" />
           </div>
-          <div className="reel-mask pointer-events-none absolute inset-0" aria-hidden="true" />
           <SiteHeader overlay />
           <div className="relative z-10 mx-auto flex max-w-6xl flex-col items-center px-5 pb-20 pt-16 text-center sm:px-8 sm:pt-20">
             <h1 className="font-display text-[clamp(5rem,12vw,10rem)] leading-[.83] text-paper">Argue <em className="font-normal text-lime">Back.</em></h1>
@@ -136,7 +141,7 @@ function Index() {
                     <Button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-haspopup="menu" className="h-10 rounded-none bg-lime px-5 text-night shadow-none hover:bg-lime/85">
                       Argue back <ChevronDown aria-hidden="true" />
                     </Button>
-                    {open && <div role="menu" aria-label="Ways to argue back" className="absolute left-0 top-full z-30 mt-1 w-[min(19rem,calc(100vw-3rem))] border border-light-line bg-night text-paper">
+                    {open && <div role="menu" aria-label="Ways to argue back" className="absolute left-0 top-full z-30 mt-1 max-h-80 w-[min(19rem,calc(100vw-3rem))] overflow-y-auto border border-light-line bg-night text-paper shadow-lg">
                        {MODES.map((item) => <Button key={item.name} type="button" role="menuitem" variant="ghost" onClick={() => selectMode(item.name)} className="h-auto w-full justify-start rounded-none border-b border-light-line px-4 py-3 text-left whitespace-normal last:border-b-0 hover:bg-forest hover:text-paper">
                          <span className="block w-full"><span className="font-display text-lg">{item.name}</span><span className="mt-1 block font-sans text-xs font-normal leading-snug text-paper/70">{item.blurb}</span></span>
                       </Button>)}

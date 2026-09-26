@@ -53,7 +53,7 @@ export function AboutChapter({ standalone = false }: { standalone?: boolean }) {
           </div>
         </div>
         <div className="mt-20 border-t border-light-line pt-8">
-          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><h3 className="font-display text-5xl">The team</h3><p className="font-sans text-sm text-paper/65">BitNBuild '26 · UAE Regional Qualifying Round</p></div>
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><h3 className="font-display text-5xl">The team</h3></div>
           <div className="mt-9 grid border-t border-light-line sm:grid-cols-2">
             {[{ name: "[Owais Husain]", role: "Frontend & Design" }, { name: "[Adwait]", role: "AI / Backend" }].map((person) => (
               <article key={person.name} className="border-b border-light-line py-7 sm:pr-8 sm:even:border-l sm:even:pl-8">
@@ -62,7 +62,6 @@ export function AboutChapter({ standalone = false }: { standalone?: boolean }) {
               </article>
             ))}
           </div>
-          <p className="mt-8 font-sans text-sm text-paper/65">GDG CRCE × GDGoC BPDC</p>
         </div>
         {standalone && <Link to="/" className="mt-14 inline-block border-b border-lime pb-1 font-sans text-lime">Explore Argue Back</Link>}
       </div>

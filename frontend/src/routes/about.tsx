@@ -7,7 +7,7 @@ export const Route = createFileRoute("/about")({
     { title: "About — Argue Back" },
     { name: "description", content: "Why Argue Back was built: contestability should be a real part of the AI chat interface, not only a research concept." },
     { property: "og:title", content: "About — Argue Back" },
-    { property: "og:description", content: "Meet the thinking behind Argue Back and its BitNBuild '26 team." },
+    { property: "og:description", content: "Meet the thinking behind Argue Back and the team building it." },
     { property: "og:type", content: "website" },
     { name: "twitter:card", content: "summary_large_image" },
   ] }), component: About,
