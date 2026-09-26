@@ -109,6 +109,9 @@ html { scroll-behavior: smooth; }
 .chapter-about {
   background: linear-gradient(155deg, var(--deep-blue) 0%, #142d3d 54%, #113039 100%);
 }
+.chapter-install {
+  background: linear-gradient(160deg, var(--deep-blue) 0%, #123e3e 50%, var(--forest) 100%);
+}
 .decay-sentence {
   display: grid;
   grid-template-rows: 1fr;

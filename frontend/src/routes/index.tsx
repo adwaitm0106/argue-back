@@ -4,7 +4,7 @@ import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ModeSelect } from "@/components/ui/mode-select";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
-import { AboutChapter, HowChapter } from "@/components/site-chapters";
+import { AboutChapter, HowChapter, InstallChapter } from "@/components/site-chapters";
 import { SilkBackdrop } from "@/components/silk-backdrop";
 import MorphGallery from "@/components/ui/morph-gallery";
 import { MODES } from "@/lib/modes";
@@ -143,7 +143,7 @@ function Index() {
             <p className="mt-8 max-w-xl font-sans text-base leading-relaxed text-muted-foreground">Every chat interface is built around agreement: you ask, it answers, you accept. Contesting the reasoning means retyping the question and hoping. Argue Back makes that challenge a control in the interface.</p></div>
           </div>
         </section>
-         <section className="bg-background py-20 sm:py-28">
+         <section id="the-modes" className="bg-background py-20 sm:py-28">
           <div className="mx-auto max-w-6xl px-5 sm:px-8">
             <div className="flex flex-col justify-between gap-5 border-b border-hairline pb-8 sm:flex-row sm:items-end"><p className="font-sans text-sm text-muted-foreground">Four ways to question an answer</p><h2 className="font-display text-4xl sm:text-6xl">The modes</h2></div>
              <div>{MODES.map((mode) => <div key={mode.name} className="grid gap-3 border-b border-hairline py-7 md:grid-cols-[1fr_1fr] md:gap-12">
@@ -153,6 +153,7 @@ function Index() {
           </div>
         </section>
          <HowChapter />
+         <InstallChapter />
          <AboutChapter />
       </main>
       <SiteFooter />
