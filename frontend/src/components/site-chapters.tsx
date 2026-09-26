@@ -29,7 +29,7 @@ export function HowChapter({ standalone = false }: { standalone?: boolean }) {
         </div>
         <div className="mt-14 grid gap-8 md:grid-cols-[.85fr_1.15fr] md:gap-20">
           <p className="font-sans text-sm text-lime">Inside The Decay</p>
-          <p className="max-w-xl font-sans text-base leading-relaxed text-paper/75">The examples on Home use prepared answers to show how each mode behaves. The extension's model-powered round trip is the intended experience as these modes go live.</p>
+          <p className="max-w-xl font-sans text-base leading-relaxed text-paper/75">The examples on Home use prepared answers to show how each mode behaves. Inside the extension, every mode runs live on the real answer you're reading.</p>
         </div>
         {standalone && <Link to="/" hash="about" className="mt-14 inline-block border-b border-lime pb-1 font-sans text-lime">Continue to About</Link>}
       </div>
@@ -98,10 +98,10 @@ export function AboutChapter({ standalone = false }: { standalone?: boolean }) {
         <div className="mt-20 border-t border-light-line pt-8">
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end"><h3 className="font-display text-5xl">The team</h3></div>
           <div className="mt-9 grid border-t border-light-line sm:grid-cols-2">
-            {[{ name: "[Owais Husain]", role: "Frontend & Design" }, { name: "[Adwait]", role: "AI / Backend" }].map((person) => (
+            {[{ name: "Owais Husain", role: "Frontend & Design" }, { name: "Adwait", role: "AI / Backend" }].map((person) => (
               <article key={person.name} className="border-b border-light-line py-7 sm:pr-8 sm:even:border-l sm:even:pl-8">
                 <h4 className="font-display text-4xl">{person.name}</h4>
-                <p className="mt-2 font-sans text-sm text-paper/65">[Role] · {person.role}</p>
+                <p className="mt-2 font-sans text-sm text-paper/65">{person.role}</p>
               </article>
             ))}
           </div>

@@ -1,6 +1,6 @@
 {
   "name": "argue-back",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "description": "Chrome extension that takes apart AI chat answers instead of regenerating them.",
   "homepage": "https://github.com/adwaitm0106/argue-back",

@@ -6,6 +6,8 @@
 
 **AI answers sound confident. Argue Back shows you how much of that confidence is earned.**
 
+**Live site:** [argue-back.vercel.app](https://argue-back.vercel.app)
+
 Argue Back is a Chrome extension that adds one button under every AI chat answer. Click it and the answer does not change. Instead, it gets taken apart in place, four different ways: watch it delete its own filler down to the real claim, see the drafts that got rejected before this one was kept, watch it get rephrased on the spot, or have every sentence marked as something the model **knows**, **infers**, or is quietly **guessing**.
 
 ## The problem
@@ -52,7 +54,7 @@ Argue Back splits the work in two.
 
 **The page is never modified.** Inline colors use the browser's CSS Custom Highlight API, and The Decay animates its own private copy of the text. Nothing about the original answer in the chat app is ever touched or rewritten.
 
-**It's covered by a real test suite.** `npm test` runs 61 checks with no dependencies and no build step: the local analyzer's sentence/hedge logic, every mode's prompt builder against edge cases (empty answers, quotes, 500-sentence walls of text), every mode's renderer against both well-formed and deliberately broken model output (missing fields, wrong types, empty arrays), and the request-racing logic itself (a stuck model gets hedged around, a bad key fails fast, an exhausted quota reports accurately). This exists because a prompt or rendering bug used to only surface when someone clicked that exact button live. Now it's caught in under half a second, every time, before it ships. CI runs the same suite, plus lint and a CodeQL security scan, on every push.
+**It's covered by a real test suite.** `npm test` runs 62 checks with no dependencies and no build step: the local analyzer's sentence/hedge logic, every mode's prompt builder against edge cases (empty answers, quotes, 500-sentence walls of text), every mode's renderer against both well-formed and deliberately broken model output (missing fields, wrong types, empty arrays), and the request-racing logic itself (a stuck model gets hedged around, a bad key fails fast, an exhausted quota reports accurately). This exists because a prompt or rendering bug used to only surface when someone clicked that exact button live. Now it's caught in under half a second, every time, before it ships. CI runs the same suite, plus lint and a CodeQL security scan, on every push.
 
 ### End to end
 
