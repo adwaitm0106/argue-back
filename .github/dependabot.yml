@@ -1,0 +1,8 @@
+version: 2
+updates:
+  # This project has no npm dependencies (see package.json), so this only tracks the
+  # GitHub Actions used in .github/workflows/ for security updates.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
