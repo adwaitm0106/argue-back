@@ -194,7 +194,12 @@
       'distinctly different to read, not just synonym-swapped. Each under 130 words.\n\n' +
       'Return JSON:\n{\n  "versions": ["version 1", "version 2", "version 3"]\n}',
     render: (data, ctx) => {
-      const versions = list(data.versions, v => v).filter(Boolean);
+      // Small/cheap models occasionally return a placeholder like "N/A" or
+      // "none" for one version instead of an actual rewrite. A short,
+      // real-looking rewrite is at least a full sentence, so anything under
+      // ~15 characters or matching a known placeholder is treated as missing.
+      const isPlaceholder = (v) => !v || v.trim().length < 15 || /^(n\/?a|none|not applicable)\.?$/i.test(v.trim());
+      const versions = list(data.versions, v => v).filter(v => !isPlaceholder(v));
       if (!versions.length) versions.push(ctx.answer);
       let idx = 0;
       const counter = el('span', { class: 'ab-muted' }, `Version 1 of ${versions.length}`);

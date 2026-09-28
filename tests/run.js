@@ -153,6 +153,8 @@ const fixtures = {
     { name: 'empty versions array', data: { versions: [] } },
     { name: 'versions is not an array', data: { versions: null } },
     { name: 'completely empty object', data: {} },
+    { name: 'model returned a placeholder for one version', data: { versions: ['A real rewrite of the answer.', 'N/A', 'Another real rewrite here.'] } },
+    { name: 'model returned only placeholders', data: { versions: ['N/A', 'none', ''] } },
   ],
   audit: [
     { name: 'well-formed', data: { sentences: [{ i: 0, confidence: 80, label: 'KNOW', why: 'fact' }], verdict: 'Solid.' } },
@@ -173,6 +175,16 @@ for (const mode of AB.MODES) {
     });
   }
 }
+
+test('The Rebuild: never displays a model placeholder like "N/A" as a real rewrite', () => {
+  const withPlaceholder = AB.MODES.find(m => m.id === 'rebuild').render(
+    { versions: ['A real rewrite of the answer.', 'N/A', 'Another real rewrite here.'] },
+    ctx
+  );
+  const shown = withPlaceholder.querySelector('.ab-rebuild-text').innerText;
+  assert(shown !== 'N/A', 'a placeholder version was shown as the displayed rewrite');
+  assert(shown.length > 15, 'displayed rewrite looks like a placeholder, not real text');
+});
 
 // ---------------------------------------------------------------------------
 
